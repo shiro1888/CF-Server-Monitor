@@ -1,8 +1,6 @@
 import { initDatabase } from './database/schema.js';
-import { checkAuth, authResponse } from './middleware/auth.js';
 import { handleAdminAPI } from './handlers/admin.js';
 import { handleAdminUI } from './handlers/admin-ui.js';
-import { handleInstallScript } from './handlers/install.js';
 import { handleUpdate } from './handlers/update.js';
 import { handleDashboard, handleServerDetail, handleServerAPI } from './handlers/dashboard.js';
 import { loadSettings } from './utils/settings.js';

@@ -827,7 +827,7 @@ export async function handleDashboard(request, env, sys) {
         <span class="terminal-dot green"></span>
       </div>
       <div class="terminal-title">
-        dashboard — ${sys.site_title} — 80×24
+        dashboard — ${sys.site_title}
       </div>
       <div style="color: var(--text-muted); font-size: 11px;">
         ${new Date().toLocaleString('zh-CN')}

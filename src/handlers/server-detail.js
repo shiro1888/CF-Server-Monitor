@@ -488,7 +488,7 @@ export async function handleServerDetail(request, env, sys, viewId) {
         <span class="terminal-dot green"></span>
       </div>
       <div class="terminal-title">
-        ${server.name} — ssh — 80×24
+        ${server.name} — ssh
       </div>
       <div class="terminal-controls">
         <span style="color: var(--text-muted);">${new Date().toLocaleString('zh-CN')}</span>

@@ -1,5 +1,6 @@
 import { checkAuth, authResponse } from '../middleware/auth.js';
 import { formatBytes } from '../utils/format.js';
+import { getThemeStyles } from '../themes/styles.js';
 
 export async function handleAdminUI(request, env, sys) {
   if (!checkAuth(request, env)) {
@@ -65,7 +66,7 @@ export async function handleAdminUI(request, env, sys) {
       `;
     }
   }
-
+  const themeStyles = getThemeStyles(sys);
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -792,9 +793,11 @@ export async function handleAdminUI(request, env, sys) {
       .toolbar { flex-direction: column; }
       .toolbar-input { width: 100%; }
     }
+    /* 主题样式保留 */
+    ${themeStyles}
   </style>
 </head>
-<body>
+<body class="${sys.theme || 'theme1'}">
   <div class="container">
     <!-- 终端顶部栏 -->
     <div class="terminal-header">
@@ -804,7 +807,7 @@ export async function handleAdminUI(request, env, sys) {
         <span class="terminal-dot green"></span>
       </div>
       <div class="terminal-title">
-        admin — ${sys.admin_title} — 80×24
+        admin — ${sys.admin_title}
       </div>
       <div style="color: var(--text-muted); font-size: 11px;">
         ${new Date().toLocaleString('zh-CN')}
