@@ -505,8 +505,8 @@ export async function handleServerDetail(request, env, sys, viewId) {
       <div class="time-selector" id="time-selector">
         <button class="time-btn" data-hours="0.167">10m</button>
         <button class="time-btn" data-hours="0.5">30m</button>
-        <button class="time-btn" data-hours="1">1h</button>
-        <button class="time-btn active" data-hours="3">3h</button>
+        <button class="time-btn active" data-hours="1">1h</button>
+        <button class="time-btn" data-hours="3">3h</button>
         <button class="time-btn" data-hours="6">6h</button>
         <button class="time-btn" data-hours="12">12h</button>
         <button class="time-btn" data-hours="24">24h</button>
@@ -719,7 +719,7 @@ export async function handleServerDetail(request, env, sys, viewId) {
     // 配置
     // =============================================
     const serverId = "${viewId}";
-    let currentHours = 3;
+    let currentHours = 1;
     let historyTimer = null;
     let statusTimer = null;
     
