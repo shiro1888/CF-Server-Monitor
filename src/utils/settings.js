@@ -1,7 +1,7 @@
 export async function loadSettings(db) {
   const defaults = {
-    site_title: 'Cloudflare server Monitor',
-    admin_title: '探针管理后台',
+    site_title: 'Cloudflare Server Monitor',
+    admin_title: 'Admin Panel',
     theme: 'theme1',
     custom_bg: '',
     custom_css: '',

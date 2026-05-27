@@ -833,7 +833,7 @@ export async function handleDashboard(request, env, sys) {
         <span class="terminal-dot green"></span>
       </div>
       <div class="terminal-title">
-        dashboard — ${sys.site_title}
+        ${sys.site_title}
       </div>
       <div></div>
     </div>

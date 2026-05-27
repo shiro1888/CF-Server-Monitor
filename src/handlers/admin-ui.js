@@ -808,7 +808,7 @@ export async function handleAdminUI(request, env, sys) {
         <span class="terminal-dot green"></span>
       </div>
       <div class="terminal-title">
-        admin — ${sys.admin_title}
+        ${sys.admin_title}
       </div>
       <div></div>
     </div>

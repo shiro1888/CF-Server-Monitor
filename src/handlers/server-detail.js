@@ -489,7 +489,7 @@ export async function handleServerDetail(request, env, sys, viewId) {
         <span class="terminal-dot green"></span>
       </div>
       <div class="terminal-title">
-        ${server.name} — ssh
+        ${server.name}
       </div>
       <div></div>
     </div>
