@@ -490,40 +490,29 @@ async function getLastAggregatedTo(db) {
 
 export async function getMetricsHistory(db, serverId, hours, columns) {
   const now = Date.now();
-  const cutoff = now - (hours * 60 * 60 * 1000);
+  const cutoff = now - hours * 60 * 60 * 1000;
 
   const aggColumns = mapColumnsToAggregated(columns);
 
-  // 获取真实聚合完成时间
+  // 聚合完成时间（关键）
   const lastAggregatedTo = await getLastAggregatedTo(db);
 
-  // 如果没有聚合记录，则默认最近30分钟走原始数据
-  const rawCutoff = lastAggregatedTo || (
-    now - (0.5 * 60 * 60 * 1000)
-  );
+  // raw 和 agg 的分界点（避免断层）
+  const rawCutoff = lastAggregatedTo || (now - 30 * 60 * 1000);
 
-  let result = [];
+  const map = new Map();
 
   console.log(
     '[History]',
-    'server:',
-    serverId,
-    'hours:',
-    hours,
-    'cutoff:',
-    new Date(cutoff).toISOString(),
-    'rawCutoff:',
-    new Date(rawCutoff).toISOString(),
-    'lastAggregatedTo:',
-    lastAggregatedTo
-      ? new Date(lastAggregatedTo).toISOString()
-      : 'null'
+    'server:', serverId,
+    'hours:', hours,
+    'cutoff:', new Date(cutoff).toISOString(),
+    'rawCutoff:', new Date(rawCutoff).toISOString()
   );
 
-  // =========================================
-  // 查询原始数据（聚合时间之后的数据）
-  // =========================================
-
+  // ======================================================
+  // 1. RAW 数据（最近数据）
+  // ======================================================
   const rawStart = Math.max(cutoff, rawCutoff);
 
   const rawResult = await db.prepare(`
@@ -532,39 +521,29 @@ export async function getMetricsHistory(db, serverId, hours, columns) {
     WHERE server_id = ?
       AND typeof(timestamp) = 'integer'
       AND timestamp >= ?
-    ORDER BY timestamp ASC
-  `).bind(
-    serverId,
-    rawStart
-  ).all();
+  `).bind(serverId, rawStart).all();
 
-  const rawData = rawResult.results.map(row => ({
-    ...row,
-    timestamp: Number(row.timestamp)
-  }));
+  for (const row of rawResult.results) {
+    const ts = Number(row.timestamp);
+    map.set(ts, {
+      ...row,
+      timestamp: ts
+    });
+  }
 
-  result = result.concat(rawData);
+  console.log(`[History] RAW: ${rawResult.results.length}`);
 
-  console.log(
-    `[History] 原始数据 ${rawData.length} 条`
-  );
-
-  // =========================================
-  // 查询聚合数据（聚合完成时间之前的数据）
-  // =========================================
-
+  // ======================================================
+  // 2. AGG 数据（历史数据）
+  // ======================================================
   for (const phase of AGGREGATE_PHASES) {
-    const phaseStart = now - (phase.maxHours * 60 * 60 * 1000);
-    const phaseEnd = now - (phase.minHours * 60 * 60 * 1000);
+    const phaseStart = now - phase.maxHours * 3600 * 1000;
+    const phaseEnd = now - phase.minHours * 3600 * 1000;
 
     const queryStart = Math.max(cutoff, phaseStart);
-
-    // 聚合数据最多只查到真实聚合完成时间
     const queryEnd = Math.min(phaseEnd, rawCutoff);
 
-    if (queryStart >= queryEnd) {
-      continue;
-    }
+    if (queryStart >= queryEnd) continue;
 
     const aggResult = await db.prepare(`
       SELECT 
@@ -575,7 +554,6 @@ export async function getMetricsHistory(db, serverId, hours, columns) {
         AND bucket_size = ?
         AND bucket >= ?
         AND bucket < ?
-      ORDER BY bucket ASC
     `).bind(
       serverId,
       phase.bucketSeconds,
@@ -583,27 +561,28 @@ export async function getMetricsHistory(db, serverId, hours, columns) {
       queryEnd
     ).all();
 
-    const phaseData = aggResult.results.map(row => ({
-      ...row,
-      timestamp: Number(row.timestamp)
-    }));
+    for (const row of aggResult.results) {
+      const ts = Number(row.timestamp);
 
-    console.log(
-      `[History] 聚合阶段 ${phase.name}: ${phaseData.length} 条`
-    );
+      // ⭐关键：避免覆盖 raw 数据
+      if (!map.has(ts)) {
+        map.set(ts, {
+          ...row,
+          timestamp: ts
+        });
+      }
+    }
 
-    result = result.concat(phaseData);
+    console.log(`[History] ${phase.name}: ${aggResult.results.length}`);
   }
 
-  // =========================================
-  // 排序
-  // =========================================
-
+  // ======================================================
+  // 3. 输出排序
+  // ======================================================
+  const result = Array.from(map.values());
   result.sort((a, b) => a.timestamp - b.timestamp);
 
-  console.log(
-    `[History] 最终返回 ${result.length} 条数据`
-  );
+  console.log(`[History] FINAL: ${result.length}`);
 
   return result;
 }
