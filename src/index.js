@@ -5,7 +5,7 @@ import { handleAdminAPI } from './handlers/admin.js';
 import { serveFrontend } from './handlers/frontend.js';
 import { handleUpdate, handleWebSocketUpgrade } from './handlers/update.js';
 import { handleServerAPI, handleServersAPI } from './handlers/dashboard.js';
-import { loadSettings } from './utils/settings.js';
+import { loadSettings, loadSiteSettings } from './utils/settings.js';
 import { checkAuth, simpleAuthResponse } from './middleware/auth.js';
 import { getServerDetail, getMetricsHistoryCache, setMetricsHistoryCache } from './utils/cache.js';
 
@@ -152,10 +152,6 @@ export default {
       }
     }
 
-    const sys = await loadSettings(env.DB);
-    const turnstileEnabled = sys.turnstile_enabled === 'true';
-    const turnstileSecretKey = sys.turnstile_secret_key || '';
-
     const bypassTurnstilePaths = [
       '/update',
       '/admin/api',
@@ -167,123 +163,58 @@ export default {
 
     const isApiRequest = path.startsWith('/api/') || path.startsWith('/admin/api');
     let setTurnstileCookie = false;
+    let sys = null;
     
-    if (turnstileEnabled && isApiRequest && !bypassTurnstilePaths.includes(path)) {
-      const cookies = request.headers.get('Cookie') || '';
-      const turnstileCookie = cookies.split(';').find(c => c.trim().startsWith('turnstile_verified='));
-      
-      let hasValidCookie = false;
-      if (turnstileCookie) {
-        const encryptedData = turnstileCookie.split('=')[1];
-        const decrypted = await decryptCookieData(encryptedData, env);
-        if (decrypted && decrypted.expires && Date.now() < decrypted.expires * 1000) {
-          hasValidCookie = true;
-        }
-      }
-      
-      if (!hasValidCookie) {
-        const turnstileToken = request.headers.get('X-Turnstile-Token');
-        const isVerified = await verifyTurnstileToken(turnstileToken, turnstileSecretKey);
-        
-        if (!isVerified) {
-          return new Response(JSON.stringify({ error: 'Turnstile verification failed' }), {
-            status: 403,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-        
-        setTurnstileCookie = true;
-      }
-    }
-
-    async function handleManualCleanup() {
-      if (!await checkAuth(request, env, sys)) {
-        return simpleAuthResponse();
-      }
-      
-      const result = await cleanupOldData(env.DB);
-      
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    async function handleUpdateDatabase() {
-      if (!await checkAuth(request, env, sys)) {
-        return simpleAuthResponse();
-      }
-      
-      const result = await updateDatabase(env.DB);
-      
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    async function handleRebuildDatabase() {
-      if (!await checkAuth(request, env, sys)) {
-        return simpleAuthResponse();
-      }
-      
-      const result = await rebuildDatabase(env.DB);
-      
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    async function handleGetConfig() {
-      let cookieAuth = false;
+    if (isApiRequest && !bypassTurnstilePaths.includes(path)) {
+      sys = await loadSiteSettings(env.DB);
+      const turnstileEnabled = sys.turnstile_enabled === 'true';
+      const turnstileSecretKey = sys.turnstile_secret_key || '';
       
       if (turnstileEnabled) {
         const cookies = request.headers.get('Cookie') || '';
         const turnstileCookie = cookies.split(';').find(c => c.trim().startsWith('turnstile_verified='));
         
+        let hasValidCookie = false;
         if (turnstileCookie) {
           const encryptedData = turnstileCookie.split('=')[1];
           const decrypted = await decryptCookieData(encryptedData, env);
           if (decrypted && decrypted.expires && Date.now() < decrypted.expires * 1000) {
-            cookieAuth = true;
+            hasValidCookie = true;
           }
         }
-      }
-      
-      if (cookieAuth) {
-        return new Response(JSON.stringify({
-          turnstile_enabled: true,
-          turnstile_site_key: sys.turnstile_site_key || '',
-          cookie_auth: true
-        }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
-      } else {
-        return new Response(JSON.stringify({
-          turnstile_enabled: turnstileEnabled,
-          turnstile_site_key: sys.turnstile_site_key || '',
-          cookie_auth: false
-        }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
+        
+        if (!hasValidCookie) {
+          const turnstileToken = request.headers.get('X-Turnstile-Token');
+          const isVerified = await verifyTurnstileToken(turnstileToken, turnstileSecretKey);
+          
+          if (!isVerified) {
+            return new Response(JSON.stringify({ error: 'Turnstile verification failed' }), {
+              status: 403,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          
+          setTurnstileCookie = true;
+        }
       }
     }
 
+    async function ensureSiteSettings() {
+      if (!sys) {
+        sys = await loadSiteSettings(env.DB);
+      }
+      return sys;
+    }
+
+    async function ensureFullSettings() {
+      if (!sys || !sys.site_title) {
+        sys = await loadSettings(env.DB);
+      }
+      return sys;
+    }
+
     const routes = [
-      { method: 'GET', path: '/clear', handler: handleManualCleanup },
-      { method: 'GET', path: '/updateDatabase', handler: handleUpdateDatabase },
-      { method: 'GET', path: '/rebuild', handler: handleRebuildDatabase },
-      { method: 'POST', path: '/admin/api', handler: async () => {
-        return handleAdminAPI(request, env, sys);
-      }},
       { method: 'POST', path: '/update', handler: () => handleUpdate(request, env, ctx) },
-      { method: 'GET', path: '/api/server', handler: async () => {
-        return handleServerAPI(request, env, sys);
-      }},
-      { method: 'GET', path: '/api/servers', handler: async () => {
-        return handleServersAPI(request, env, sys);
-      }},
-      // WebSocket 实时推送入口（Durable Object）
-      { method: 'GET', path: '/api/ws', handler: async () => handleWebSocketUpgrade(request, env) },
-      // Durable Object 健康检查（同时作为 bundler 引用点，确保 MetricsBroadcaster 被打包）
       { method: 'GET', path: '/__do/health', handler: async () => {
         if (!env.METRICS_BROADCASTER) {
           return new Response(JSON.stringify({ ok: false, reason: 'DO not bound' }), {
@@ -300,18 +231,98 @@ export default {
           });
         }
       }},
-      { method: 'GET', path: '/api/config', handler: handleGetConfig },
+      { method: 'GET', path: '/api/config', handler: async () => {
+        await ensureSiteSettings();
+        const turnstileEnabled = sys.turnstile_enabled === 'true';
+        let cookieAuth = false;
+        
+        if (turnstileEnabled) {
+          const cookies = request.headers.get('Cookie') || '';
+          const turnstileCookie = cookies.split(';').find(c => c.trim().startsWith('turnstile_verified='));
+          
+          if (turnstileCookie) {
+            const encryptedData = turnstileCookie.split('=')[1];
+            const decrypted = await decryptCookieData(encryptedData, env);
+            if (decrypted && decrypted.expires && Date.now() < decrypted.expires * 1000) {
+              cookieAuth = true;
+            }
+          }
+        }
+        
+        if (cookieAuth) {
+          return new Response(JSON.stringify({
+            turnstile_enabled: true,
+            turnstile_site_key: sys.turnstile_site_key || '',
+            cookie_auth: true
+          }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          return new Response(JSON.stringify({
+            turnstile_enabled: turnstileEnabled,
+            turnstile_site_key: sys.turnstile_site_key || '',
+            cookie_auth: false
+          }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }},
+      { method: 'GET', path: '/api/server', handler: async () => {
+        await ensureSiteSettings();
+        return handleServerAPI(request, env, sys);
+      }},
+      { method: 'GET', path: '/api/servers', handler: async () => {
+        await ensureFullSettings();
+        return handleServersAPI(request, env, sys);
+      }},
+      { method: 'GET', path: '/api/ws', handler: async () => handleWebSocketUpgrade(request, env) },
       { method: 'GET', path: '/api/history', handler: async () => {
+        await ensureSiteSettings();
         const id = url.searchParams.get('id');
         const metric = url.searchParams.get('metric') || 'cpu';
         const hours = parseFloat(url.searchParams.get('hours') || '24');
         return fetchHistoryData(env, request, id, hours, metric, sys);
       }},
       { method: 'GET', path: '/api/history/all', handler: async () => {
+        await ensureSiteSettings();
         const id = url.searchParams.get('id');
         const hours = parseFloat(url.searchParams.get('hours') || '24');
         const allColumns = 'cpu, ram, disk, processes, net_in_speed, net_out_speed, tcp_conn, udp_conn, ping_ct, ping_cu, ping_cm, ping_bd, swap_total, swap_used, load_avg';
         return fetchHistoryData(env, request, id, hours, allColumns, sys);
+      }},
+      { method: 'POST', path: '/admin/api', handler: async () => {
+        await ensureFullSettings();
+        return handleAdminAPI(request, env, sys);
+      }},
+      { method: 'GET', path: '/clear', handler: async () => {
+        await ensureSiteSettings();
+        if (!await checkAuth(request, env, sys)) {
+          return simpleAuthResponse();
+        }
+        const result = await cleanupOldData(env.DB);
+        return new Response(JSON.stringify(result), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }},
+      { method: 'GET', path: '/updateDatabase', handler: async () => {
+        await ensureSiteSettings();
+        if (!await checkAuth(request, env, sys)) {
+          return simpleAuthResponse();
+        }
+        const result = await updateDatabase(env.DB);
+        return new Response(JSON.stringify(result), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }},
+      { method: 'GET', path: '/rebuild', handler: async () => {
+        await ensureSiteSettings();
+        if (!await checkAuth(request, env, sys)) {
+          return simpleAuthResponse();
+        }
+        const result = await rebuildDatabase(env.DB);
+        return new Response(JSON.stringify(result), {
+          headers: { 'Content-Type': 'application/json' }
+        });
       }}
     ];
 
@@ -338,7 +349,8 @@ export default {
       }
     }
 
-    return serveFrontend(request, env);
+    await ensureFullSettings();
+    return serveFrontend(request, env, sys);
   },
 
   async scheduled(event, env, ctx) {

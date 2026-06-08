@@ -14,7 +14,7 @@
     <div class="server-meta">
       <div class="card-meta">
         <div v-if="sysConfig.show_price && server.price" class="card-meta-item">💰 {{ server.price }}</div>
-        <div v-if="sysConfig.show_expire && server.expire_date" class="card-meta-item">📅 {{ expireText }}</div>
+        <div v-if="sysConfig.show_expire && server.expire_date" class="card-meta-item">📅 <span :class="{ 'expired': isExpired }">{{ expireText }}</span></div>
       </div>
       <div class="card-badges">
         <span v-if="sysConfig.show_bw && server.bandwidth" class="badge badge-bw">{{ server.bandwidth }}</span>
@@ -122,11 +122,17 @@ const netOutSpeed = computed(() => formatBytes(props.server.net_out_speed))
 const totalRx = computed(() => formatBytes(props.server.net_rx))
 const totalTx = computed(() => formatBytes(props.server.net_tx))
 
+const isExpired = computed(() => {
+  const expTime = new Date(props.server.expire_date).getTime()
+  return !isNaN(expTime) && expTime < now
+})
+
 const expireText = computed(() => {
   const expTime = new Date(props.server.expire_date).getTime()
   if (isNaN(expTime)) return ''
   const diff = expTime - now
-  return diff > 0 ? Math.ceil(diff / (1000 * 3600 * 24)) + 'd' : '<span style="color:var(--accent-red);">EXPIRED</span>'
+  const days = Math.ceil(diff / (1000 * 3600 * 24))
+  return days > 0 ? `${days}${trans.value.expireDays}` : trans.value.expired
 })
 
 const isPingValid = (ping) => {

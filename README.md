@@ -1,6 +1,6 @@
 # CF-Server-Monitor
 
-**版本：V2.5.0**
+**版本：V2.5.1**
 
 **演示地址**：[https://tz.dashdeep.dpdns.org/](https://tz.dashdeep.dpdns.org/)
 
@@ -8,7 +8,7 @@
 
 ## ✨ 功能特点
 
-- 📊 **实时监控**：CPU、内存、磁盘、网络、进程数、连接数、负载均衡，探针上报后通过 WebSocket **立即推送**到前端，无延迟
+- 📊 **实时监控**：CPU、内存、磁盘、网络、进程数、连接数、负载均衡
 - 📈 **历史图表**：支持 1/3/6/12/24 小时历史数据查看
 - 🌍 **全球地图**：可视化展示服务器分布
 - 🔔 **离线告警**：支持 Telegram 和企业微信通知
@@ -33,12 +33,11 @@
 
 新用户点击一键部署
 
-修改API_SECRET密码
+修改`API_SECRET`，建议使用随机密码，登录密码在登录后修改，建议和API_SECRET不同。
 
-在build command中填入 `npm run build:frontend`
+在build command中填入 `npm run build:frontend`，其他保持默认
 
 点击部署即可
-
 
 </details>
 
@@ -97,8 +96,8 @@
 | ---------------- | ------------------------- | ----------------- |
 | `CF_API_TOKEN`   | 第三步获取的 Token              | Cloudflare API 令牌 |
 | `CF_ACCOUNT_ID`  | 第三步获取的 ID                 | Cloudflare 账户 ID  |
-| `API_USER_NAME`  | 自定义用户名（非必填）            | 管理后台用户名   |
-| `API_SECRET`     | API 认证密钥（必填）             | 探针认证密钥 & 管理后台密码   |
+| `API_USER_NAME`  | 自定义用户名（非必填）            | 管理后台用户名 新版已移除，默认用户名admin   |
+| `API_SECRET`     | API 认证密钥（必填）             | 探针认证密钥 & 默认管理后台密码 建议使用随机密码  |
 | `D1_DATABASE_ID` | 第二步获取的 Database ID        | D1 数据库 ID         |
 
 ### 第五步：部署
@@ -133,7 +132,12 @@ git push origin main
 
 部署进度可在 **Actions** 标签页中查看。
 
-### 第六步：访问管理后台
+</details>
+
+
+## 📊 使用说明
+<details>
+<summary>访问管理后台</summary>
 
 部署成功后，访问管理后台：
 
@@ -144,16 +148,14 @@ https://你的项目名.你的子域.workers.dev/admin
 - 用户名：默认admin，如果设置了环境变量 `API_USER_NAME`，则使用该值
 - 密码：你设置的 `API_SECRET`
 
-登录后务必修改用户名和密码，以确保安全。
+**登录后务必修改用户名和密码，以确保安全。** 强烈建议登录密码和探针认证密钥不同。
 
 > **提示**：项目名和子域可以在 Cloudflare Workers & Pages 页面找到。建议绑定域名，避免国内无法访问
+
 </details>
 
-
-## 📊 使用说明
-
 <details>
-<summary>🖥️ 添加服务器监控</summary>
+<summary>添加服务器监控</summary>
 
 ### 在管理后台添加服务器
 
@@ -167,13 +169,13 @@ https://你的项目名.你的子域.workers.dev/admin
 Ubuntu / Debian / CentOS / RHEL / Fedora / Rocky / AlmaLinux 系统
 
 ```bash
-curl -sL https://你的项目.你的子域.workers.dev/install.sh | bash -s install <SERVER_ID> <SECRET> <WORKER_URL> [INTERVAL]
+curl -sL https://你的项目.你的子域.workers.dev/install.sh | bash -s install <SERVER_ID> <SECRET> <WORKER_URL> [INTERVAL] [PING_TYPE]
 ```
 
 Alpine 系统
 
 ```bash
-curl -sL https://你的项目.你的子域.workers.dev/install-alpine | sh -s install <SERVER_ID> <SECRET> <WORKER_URL> [INTERVAL]
+curl -sL https://你的项目.你的子域.workers.dev/install-alpine | sh -s install <SERVER_ID> <SECRET> <WORKER_URL> [INTERVAL] [PING_TYPE]
 ```
 
 
@@ -200,6 +202,7 @@ curl -sL https://你的项目.你的子域.workers.dev/install-alpine | sh -s in
 | `SECRET`     | API 认证密钥（必填）    | -    |
 | `WORKER_URL` | Worker 上报地址（必填） | -    |
 | `INTERVAL`   | 数据上报间隔（秒）       | `60` |
+| `PING_TYPE`  | Ping 检测类型（`http`/`tcp`） | `http` |
 
 > **注意**：上报间隔越短，数据越实时，但会增加 API 调用和数据库存储。建议根据服务器数量和网络状况选择合适的间隔。
 </details>

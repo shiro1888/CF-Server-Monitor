@@ -40,8 +40,8 @@
           </div>
           <div class="header-actions">
             <button @click="refreshStats" class="btn">↻ {{ trans.refresh }}</button>
+            <a href="/" class="btn">🏠 {{ trans.dashboard }}</a>
             <button @click="logout" class="btn btn-red">🚪 {{ trans.logout }}</button>
-            <a href="/" class="btn">▸ {{ trans.dashboard }}</a>
           </div>
         </div>
 
@@ -107,8 +107,8 @@
             <table class="terminal-table">
               <thead>
                 <tr>
-                  <th class="table-center-cell" style="width:35px;">↕️</th>
-                  <th style="width:30px;"><input type="checkbox" id="select-all" @change="handleSelectAll" style="accent-color: var(--accent-green);"></th>
+                  <th class="table-center-cell col-width-35">↕️</th>
+                  <th class="col-width-30"><input type="checkbox" id="select-all" @change="handleSelectAll" class="checkbox-accent-green"></th>
                   <th>{{ trans.hostname.toUpperCase() }}</th>
                   <th>{{ trans.group.toUpperCase() }}</th>
                   <th>{{ trans.price.toUpperCase() }}</th>
@@ -132,12 +132,12 @@
                   <td class="drag-handle table-center-cell" :title="trans.dragSort" draggable="true" @dragstart="handleDragStart" @dragover.prevent @drop="handleDrop($event, server.id)">⋮⋮</td>
                   <td class="table-center-cell"><input type="checkbox" class="server-checkbox" :value="server.id" v-model="selectedServers"></td>
                   <td>
-                    <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="server-info">
                       <span v-if="server.country && server.country !== 'xx'">
-                        <img :src="'https://flagcdn.com/24x18/' + server.country.toLowerCase() + '.png'" :alt="server.country" style="vertical-align: middle; border-radius: 2px; filter: brightness(0.9);">
+                        <img :src="'https://flagcdn.com/24x18/' + server.country.toLowerCase() + '.png'" :alt="server.country" class="flag-img">
                       </span>
                       <span v-else>🏳️</span>
-                      <a :href="'/server/' + server.id" style="color:var(--text-primary); font-weight:bold; text-decoration:none;">{{ server.name }}</a>
+                      <a :href="'/server/' + server.id" class="server-name-link">{{ server.name }}</a>
                     </div>
                   </td>
                   <td><span class="group-tag">{{ server.server_group || trans.default }}</span></td>
@@ -146,7 +146,7 @@
                   <td><span class="spec-text">{{ server.bandwidth || '-' }}</span></td>
                   <td><span class="spec-text">{{ server.traffic_limit || '-' }}</span></td>
                   <td>
-                    <span :style="{ color: getStatusColor(server), fontWeight: 'bold' }">{{ getStatusText(server) }}</span>
+                    <span :style="{ color: getStatusColor(server) }" class="font-bold">{{ getStatusText(server) }}</span>
                   </td>
                   <td>
                     <div class="action-group">
@@ -184,10 +184,10 @@
 
               <div class="form-group">
                 <label class="form-label">{{ trans.bgImage }}</label>
-                <div style="display:flex; gap:8px;">
-                  <input type="text" v-model="settings.custom_bg" class="form-input" placeholder="https://..." style="flex:1;">
+                <div class="flex" style="gap:8px;">
+                  <input type="text" v-model="settings.custom_bg" class="form-input flex-1" placeholder="https://...">
                   <div class="upload-btn-wrapper">
-                    <button class="btn" style="margin:0;">📁 {{ trans.upload }}</button>
+                    <button class="btn btn-margin-0">📁 {{ trans.upload }}</button>
                     <input type="file" accept="image/*" @change="uploadBg">
                   </div>
                 </div>
@@ -208,7 +208,7 @@
             </div>
 
             <div>
-              <div class="settings-section" style="margin-bottom: 20px;">
+              <div class="settings-section mb-5">
                 <div class="section-title"><span>▸</span> {{ trans.displayOptions }}</div>
 
                 <div class="checkbox-item">
@@ -293,16 +293,16 @@
                 </div>
               </div>
 
-              <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">
-                <span style="color: var(--accent-yellow);">[i]</span> 
+              <p class="text-muted text-sm mt-2">
+                <span class="warning-icon">[i]</span> 
                 {{ trans.turnstileTip }}
               </p>
             </div>
 
             <div class="settings-section">
               <div class="section-title"><span>▸</span> {{ trans.adminLoginSettings }}</div>
-              <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
-                <span style="color: var(--accent-yellow);">[i]</span>
+              <p class="text-muted text-sm mb-3">
+                <span class="warning-icon">[i]</span>
                 {{ trans.adminLoginTip }}
               </p>
 
@@ -331,8 +331,8 @@
                 </div>
               </div>
 
-              <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">
-                <span style="color: var(--accent-yellow);">[i]</span>
+              <p class="text-muted text-sm mt-2">
+                <span class="warning-icon">[i]</span>
                 {{ trans.apiSecretTip }}
               </p>
             </div>
@@ -350,15 +350,15 @@
                 </div>
               </div>
 
-              <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">
-                <span style="color: var(--accent-yellow);">[i]</span> 
+              <p class="text-muted text-sm mt-2">
+                <span class="warning-icon">[i]</span> 
                 {{ trans.jwtSecretTip }}
               </p>
             </div>
           </div>
 
-          <div style="margin-top: 20px; text-align: right;">
-            <button @click="saveSettings" class="btn btn-primary" :disabled="saving" style="padding: 12px 24px; font-size: 14px;">{{ saving ? '⏳' : '💾' }} {{ saving ? trans.saving : trans.saveConfig }}</button>
+          <div class="text-right mt-5">
+            <button @click="saveSettings" class="btn btn-primary btn-lg" :disabled="saving">{{ saving ? '⏳' : '💾' }} {{ saving ? trans.saving : trans.saveConfig }}</button>
           </div>
         </div>
 
@@ -366,17 +366,17 @@
           <div class="settings-section">
             <div class="section-title"><span>▸</span> {{ trans.dbManagement }}</div>
             
-            <div style="display: flex; gap: 20px;">
-              <div class="form-group" style="flex: 1;">
+            <div class="settings-grid">
+              <div class="form-group">
                 <label class="form-label">{{ trans.upgradeDatabase }}</label>
-                <p style="color: var(--text-muted); margin-bottom: 8px;">{{ trans.upgradeDesc }}</p>
-                <button @click="openDbModal('upgrade')" class="btn btn-primary" :disabled="dbLoading" style="padding: 12px 24px; font-size: 14px;">⬆️ {{ trans.upgradeDatabase }}</button>
+                <p class="text-muted mb-2">{{ trans.upgradeDesc }}</p>
+                <button @click="openDbModal('upgrade')" class="btn btn-primary btn-lg" :disabled="dbLoading">⬆️ {{ trans.upgradeDatabase }}</button>
               </div>
 
-              <div class="form-group" style="flex: 1;">
-                <label class="form-label" style="color: var(--accent-red); font-weight: 600;">⚠️ {{ trans.rebuildDatabase }}</label>
-                <p style="color: var(--text-muted); margin-bottom: 8px;">{{ trans.rebuildDesc }}</p>
-                <button @click="openDbModal('rebuild')" class="btn btn-red" :disabled="dbLoading" style="padding: 12px 24px; font-size: 14px;">🗑️ {{ trans.rebuildDatabase }}</button>
+              <div class="form-group">
+                <label class="form-label danger-label">⚠️ {{ trans.rebuildDatabase }}</label>
+                <p class="text-muted mb-2">{{ trans.rebuildDesc }}</p>
+                <button @click="openDbModal('rebuild')" class="btn btn-red btn-lg" :disabled="dbLoading">🗑️ {{ trans.rebuildDatabase }}</button>
               </div>
             </div>
           </div>
@@ -422,11 +422,11 @@
           </div>
 
           <div class="form-group">
-            <div class="checkbox-item" style="margin:0;">
+            <div class="checkbox-item no-margin">
               <input type="checkbox" v-model="editForm.is_hidden">
               <label>
                 <b>{{ trans.hideFromPublic }}</b><br>
-                <span style="font-size:10px;color:var(--text-muted);">{{ trans.hideDesc }}</span>
+                <span class="text-xs text-muted">{{ trans.hideDesc }}</span>
               </label>
             </div>
           </div>
@@ -446,29 +446,29 @@
           </div>
           <input type="hidden" v-model="deleteServerId">
 
-          <div style="margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-              <span style="color: var(--accent-red); font-size: 20px;">⚠️</span>
-              <span style="color: var(--accent-red); font-weight: 600;">{{ trans.dangerWarning }}</span>
+          <div class="mb-4">
+            <div class="flex-center-gap-sm mb-3">
+              <span class="danger-icon text-xl">⚠️</span>
+              <span class="danger-label">{{ trans.dangerWarning }}</span>
             </div>
-            <p style="color: var(--text-secondary); font-size: 12px; line-height: 1.6;">
+            <p class="text-secondary text-sm line-height-1-6">
               {{ trans.deleteConfirm }}
               <br><br>
-              <strong style="color: var(--text-primary);">{{ trans.recommendUninstall }}：</strong>
+              <strong class="text-primary">{{ trans.recommendUninstall }}：</strong>
             </p>
           </div>
 
-          <div class="cmd-input-wrapper" :class="{ copied: uninstallCopied }" style="margin-bottom: 12px;">
+          <div class="cmd-input-wrapper mb-3" :class="{ copied: uninstallCopied }">
             <span class="cmd-prompt">$</span>
-            <input type="text" readonly :value="getUninstallCommand()" class="cmd-input" style="flex: 1;">
-            <button @click="copyUninstallCmd" class="btn btn-icon btn-green" :title="trans.copy" style="margin-left: 8px;">{{ uninstallCopied ? '✅' : '📋' }}</button>
+            <input type="text" readonly :value="getUninstallCommand()" class="cmd-input flex-1">
+            <button @click="copyUninstallCmd" class="btn btn-icon btn-green ml-2" :title="trans.copy">{{ uninstallCopied ? '✅' : '📋' }}</button>
           </div>
 
-          <p style="color: var(--text-muted); margin-bottom: 16px;">
-            <span style="color: var(--accent-yellow);">[i]</span> {{ trans.clickToCopyCmd }}
+          <p class="text-muted mb-4">
+            <span class="warning-icon">[i]</span> {{ trans.clickToCopyCmd }}
           </p>
 
-          <div class="modal-footer" style="justify-content: space-between;">
+          <div class="modal-footer flex-justify-between">
             <button @click="confirmDelete" class="btn btn-red">{{ trans.confirmDelete }}</button>
             <button @click="closeDeleteModal" class="btn">{{ trans.cancelAction }}</button>
           </div>
@@ -506,8 +506,8 @@
               <option value="http">HTTP</option>
               <option value="tcp">TCP</option>
             </select>
-            <p style="color: var(--text-muted); margin-top: 8px;">
-              <span style="color: var(--accent-yellow);">[i]</span> {{ trans.tcpWarning }}
+            <p class="text-muted text-sm mt-2">
+              <span class="warning-icon">[i]</span> {{ trans.tcpWarning }}
             </p>
           </div>
 
@@ -515,11 +515,11 @@
             <label class="form-label">{{ trans.installCommand }}</label>
             <div class="cmd-input-wrapper" :class="{ copied: copiedCmd }">
               <span class="cmd-prompt">$</span>
-              <input type="text" readonly :value="getCustomInstallCommand()" class="cmd-input" style="flex: 1;">
+              <input type="text" readonly :value="getCustomInstallCommand()" class="cmd-input flex-1">
             </div>
           </div>
 
-          <div class="modal-footer" style="justify-content: flex-end;">
+          <div class="modal-footer flex-justify-end">
             <button @click="copyCustomCmd" class="btn btn-primary">{{ copiedCmd ? '✅ ' + trans.copied : '📋 ' + trans.copy }}</button>
             <button @click="closeCopyModal" class="btn">{{ trans.close }}</button>
           </div>
@@ -533,38 +533,38 @@
             <button class="modal-close" @click="closeDbModal" :disabled="dbLoading">✕</button>
           </div>
 
-          <div v-if="dbOperation === 'rebuild'" style="margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-              <span style="color: var(--accent-red); font-size: 20px;">⚠️</span>
-              <span style="color: var(--accent-red); font-weight: 600;">{{ trans.dangerOperation }}</span>
+          <div v-if="dbOperation === 'rebuild'" class="mb-4">
+            <div class="flex-center-gap-sm mb-3">
+              <span class="danger-icon text-xl">⚠️</span>
+              <span class="danger-label">{{ trans.dangerOperation }}</span>
             </div>
-            <p style="color: var(--text-secondary); font-size: 12px; line-height: 1.6;">
+            <p class="text-secondary text-sm line-height-1-6">
               {{ trans.rebuildWarning }}
             </p>
           </div>
 
-          <div v-if="dbOperation === 'upgrade'" style="margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-              <span style="color: var(--accent-yellow); font-size: 20px;">ℹ️</span>
+          <div v-if="dbOperation === 'upgrade'" class="mb-4">
+            <div class="flex-center-gap-sm mb-3">
+              <span class="warning-icon text-xl">ℹ️</span>
               <span style="color: var(--accent-yellow); font-weight: 600;">{{ trans.upgradeDatabase }}</span>
             </div>
-            <p style="color: var(--text-secondary); font-size: 12px; line-height: 1.6;">
+            <p class="text-secondary text-sm line-height-1-6">
               {{ trans.upgradeDesc }}
             </p>
           </div>
 
-          <div v-if="dbResult" :style="{ padding: '12px', borderRadius: '4px', marginBottom: '16px', background: dbResult.success ? 'rgba(46,160,67,0.1)' : 'rgba(248,81,73,0.1)', border: '1px solid ' + (dbResult.success ? 'var(--accent-green)' : 'var(--accent-red)') }">
-            <div style="display: flex; align-items: center; gap: 8px;">
+          <div v-if="dbResult" :class="dbResult.success ? 'warning-box' : 'danger-box'" class="mb-4">
+            <div class="flex-center-gap-sm">
               <span :style="{ color: dbResult.success ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: '600' }">
                 {{ dbResult.success ? '✅' : '❌' }} {{ getMessage(dbResult.message) || (dbResult.success ? trans.operationSuccess : trans.operationFailed) }}
               </span>
             </div>
-            <div v-if="dbResult.error" style="color: var(--accent-red); margin-top: 8px;">
+            <div v-if="dbResult.error" class="text-red mt-2">
               {{ dbResult.error }}
             </div>
           </div>
 
-          <div class="modal-footer" style="justify-content: space-between;">
+          <div class="modal-footer flex-justify-between">
             <button 
               v-if="!dbResult" 
               @click="dbOperation === 'rebuild' ? handleRebuildDatabase() : handleUpgradeDatabase()" 
@@ -719,10 +719,13 @@ const handleLogin = async () => {
     loginLoading.value = false
   }
 
-const logout = () => {
+const logout = async () => {
   apiLogout()
   isLoggedIn.value = false
   localStorage.removeItem('turnstile_token')
+  turnstileToken.value = ''
+  
+  await loadTurnstileConfig()
 }
 
 const checkLoginStatus = () => {

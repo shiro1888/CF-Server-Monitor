@@ -155,10 +155,10 @@ export async function getMetricsHistory(db, serverId, hours, columns) {
     intervalMs = 10 * 60 * 1000;
   } else if (hours >= 6) {
     intervalMs = 5 * 60 * 1000;
-  } else if (hours <= 1) {
+  } else if (hours > 1) {
     intervalMs = 1 * 60 * 1000;
   } else {
-    intervalMs = 5 * 60 * 1000;
+    intervalMs = 10 * 1000;
   }
 
   const cutoff = now - queryHours * 60 * 60 * 1000;

@@ -71,7 +71,7 @@ function injectAppearanceSettings(html, settings) {
   return modifiedHtml;
 }
 
-export async function serveFrontend(request, env) {
+export async function serveFrontend(request, env, settings = null) {
   const url = new URL(request.url);
   const path = url.pathname;
 
@@ -81,8 +81,9 @@ export async function serveFrontend(request, env) {
   let html = files['dashboard.html'];
 
   if (html) {
-    // 加载并注入外观设置
-    const settings = await loadSettings(env.DB);
+    if (!settings) {
+      settings = await loadSettings(env.DB);
+    }
     html = injectAppearanceSettings(html, settings);
 
     return new Response(html, {

@@ -29,29 +29,11 @@ function tryParseJSON(str) {
   }
 }
 
-export async function loadSettings(db) {
+export async function loadSiteSettings(db) {
   const result = { ...defaults };
-  let hasAppearance = false;
   let hasSite = false;
 
   try {
-    // 1. 尝试从 appearance_options JSON 读取
-    const appearanceRow = await db.prepare(
-      "SELECT value FROM settings WHERE key = 'appearance_options'"
-    ).first();
-    if (appearanceRow) {
-      const parsed = tryParseJSON(appearanceRow.value);
-      if (parsed) {
-        hasAppearance = true;
-        for (const field of APPEARANCE_FIELDS) {
-          if (parsed[field] !== undefined) {
-            result[field] = parsed[field];
-          }
-        }
-      }
-    }
-
-    // 2. 尝试从 site_options JSON 读取
     const siteRow = await db.prepare(
       "SELECT value FROM settings WHERE key = 'site_options'"
     ).first();
@@ -67,7 +49,59 @@ export async function loadSettings(db) {
       }
     }
 
-    // 3. 兼容旧格式：如果 JSON 字段未找到，回退读取旧独立 key
+    if (!hasSite) {
+      const { results } = await db.prepare('SELECT * FROM settings').all();
+      if (results && results.length > 0) {
+        results.forEach(r => {
+          if (SITE_FIELDS.includes(r.key)) {
+            result[r.key] = r.value;
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.error('加载站点设置失败:', e);
+  }
+
+  return result;
+}
+
+export async function loadSettings(db) {
+  const result = { ...defaults };
+  let hasAppearance = false;
+  let hasSite = false;
+
+  try {
+    const appearanceRow = await db.prepare(
+      "SELECT value FROM settings WHERE key = 'appearance_options'"
+    ).first();
+    if (appearanceRow) {
+      const parsed = tryParseJSON(appearanceRow.value);
+      if (parsed) {
+        hasAppearance = true;
+        for (const field of APPEARANCE_FIELDS) {
+          if (parsed[field] !== undefined) {
+            result[field] = parsed[field];
+          }
+        }
+      }
+    }
+
+    const siteRow = await db.prepare(
+      "SELECT value FROM settings WHERE key = 'site_options'"
+    ).first();
+    if (siteRow) {
+      const parsed = tryParseJSON(siteRow.value);
+      if (parsed) {
+        hasSite = true;
+        for (const field of SITE_FIELDS) {
+          if (parsed[field] !== undefined) {
+            result[field] = parsed[field];
+          }
+        }
+      }
+    }
+
     if (!hasAppearance || !hasSite) {
       const { results } = await db.prepare('SELECT * FROM settings').all();
       if (results && results.length > 0) {

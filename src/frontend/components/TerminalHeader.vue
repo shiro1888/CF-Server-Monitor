@@ -22,7 +22,6 @@
         >中</button>
       </div>
       <div class="theme-toggle-wrapper">
-        <!-- <span class="theme-label">{{ t('theme') }}:</span> -->
         <div class="theme-toggle">
           <button 
             class="theme-btn" 
@@ -44,6 +43,7 @@
           >☀</button>
         </div>
       </div>
+      <a href="/admin" class="admin-link-header">⚙ {{ t('admin') }}</a>
     </div>
   </div>
 </template>

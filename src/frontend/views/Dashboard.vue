@@ -23,7 +23,6 @@
               @click="switchView('map')"
             >◉ {{ trans.map }}</button>
           </div>
-          <a href="/admin" class="admin-link">⚙ {{ sysConfig.admin_title || 'Admin' }}</a>
         </div>
       </div>
       <div class="filter-bar" id="ajax-filters">

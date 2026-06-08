@@ -250,6 +250,112 @@ body::before {
     letter-spacing: 0.5px;
 }
 
+.admin-link-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--accent-cyan);
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.admin-link-header:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-active);
+}
+
+/* --------------------------------------------------------------------------
+   User Menu Components
+   -------------------------------------------------------------------------- */
+.user-menu-wrapper {
+    position: relative;
+}
+
+.user-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+}
+
+.user-menu-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-active);
+    color: var(--accent-cyan);
+}
+
+.user-menu-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 160px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-active);
+    border-radius: 4px;
+    padding: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+}
+
+.user-menu-dropdown.active {
+    display: block;
+    animation: fadeIn 0.15s ease;
+}
+
+.user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: var(--terminal-font);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.user-menu-item:hover {
+    background: var(--bg-hover);
+    color: var(--accent-cyan);
+}
+
+.user-menu-item-logout {
+    color: var(--accent-red);
+}
+
+.user-menu-item-logout:hover {
+    background: rgba(248, 81, 73, 0.1);
+    color: var(--accent-red);
+}
+
+.user-menu-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 4px 0;
+}
+
 /* --------------------------------------------------------------------------
    7. Navigation & Header Components
    -------------------------------------------------------------------------- */
@@ -652,6 +758,10 @@ body::before {
 .card-meta {
     display: flex;
     gap: 12px;
+}
+
+.card-meta-item .expired {
+    color: var(--accent-red);
 }
 
 .card-badges {
@@ -1381,6 +1491,10 @@ body::before {
     color: var(--accent-cyan);
 }
 
+.sysinfo-value.expired {
+    color: var(--accent-red);
+}
+
 /* --------------------------------------------------------------------------
    26. Chart Components
    -------------------------------------------------------------------------- */
@@ -1729,6 +1843,10 @@ body::before {
         padding: 8px;
     }
 
+    .btn, .tab-btn{
+        padding: 8px;
+    }
+
     .terminal-dots{
         gap: 3px;
         width: auto;
@@ -1737,6 +1855,10 @@ body::before {
     .terminal-dot{
         width: 6px;
         height: 6px;
+    }
+
+    .terminal-title{
+        display: none;
     }
 
     .lang-toggle, .theme-toggle{
@@ -1761,10 +1883,6 @@ body::before {
 
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
-    }
-
-    .toolbar {
-        flex-direction: column;
     }
 
     .toolbar-input {
@@ -2246,4 +2364,136 @@ body::before {
 
 .password-toggle:hover {
     background: rgba(255, 255, 255, 0.05);
+}
+
+/* --------------------------------------------------------------------------
+   43. Utility Classes
+   -------------------------------------------------------------------------- */
+.flex {
+    display: flex;
+}
+
+.flex-center {
+    display: flex;
+    align-items: center;
+}
+
+.flex-center-gap-sm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.flex-center-gap-md {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.flex-justify-between {
+    display: flex;
+    justify-content: space-between;
+}
+
+.flex-justify-end {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mt-4 { margin-top: 16px; }
+.mt-5 { margin-top: 20px; }
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-5 { margin-bottom: 20px; }
+
+.ml-1 { margin-left: 4px; }
+.ml-2 { margin-left: 8px; }
+.ml-3 { margin-left: 12px; }
+.ml-4 { margin-left: 16px; }
+
+.mr-1 { margin-right: 4px; }
+.mr-2 { margin-right: 8px; }
+.mr-3 { margin-right: 12px; }
+.mr-4 { margin-right: 16px; }
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+.text-green { color: var(--accent-green); }
+.text-blue { color: var(--accent-blue); }
+.text-yellow { color: var(--accent-yellow); }
+.text-red { color: var(--accent-red); }
+
+.font-bold { font-weight: bold; }
+.font-semibold { font-weight: 600; }
+
+.text-xs { font-size: 10px; }
+.text-sm { font-size: 12px; }
+.text-base { font-size: 13px; }
+.text-lg { font-size: 14px; }
+.text-xl { font-size: 20px; }
+
+.line-height-1-6 { line-height: 1.6; }
+
+.no-margin { margin: 0; }
+
+.btn-margin-0 { margin: 0; }
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 14px;
+}
+
+.danger-label {
+    color: var(--accent-red);
+    font-weight: 600;
+}
+
+.warning-icon {
+    color: var(--accent-yellow);
+}
+
+.danger-icon {
+    color: var(--accent-red);
+}
+
+.warning-box {
+    padding: 12px;
+    border-radius: 4px;
+    background: rgba(46, 160, 67, 0.1);
+    border: 1px solid var(--accent-green);
+}
+
+.danger-box {
+    padding: 12px;
+    border-radius: 4px;
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid var(--accent-red);
+}
+
+.col-width-30 {
+    width: 30px;
+}
+
+.col-width-35 {
+    width: 35px;
+}
+
+.checkbox-accent-green {
+    accent-color: var(--accent-green);
 }

@@ -41,13 +41,17 @@
           <span class="sysinfo-label">⏱ {{ trans.uptime }}</span>
           <span class="sysinfo-value">{{ formatUptime(server.boot_time) }}</span>
         </div>
+        <div class="sysinfo-item" v-if="server.expire_date">
+          <span class="sysinfo-label">📅 {{ trans.expire }}</span>
+          <span class="sysinfo-value" :class="{ 'expired': isExpired }">{{ expireDaysText }}</span>
+        </div>
         <div class="sysinfo-item">
           <span class="sysinfo-label">🏗 {{ trans.architecture }}</span>
           <span class="sysinfo-value">{{ server.arch || 'N/A' }}</span>
         </div>
         <div class="sysinfo-item">
           <span class="sysinfo-label">💻 {{ trans.os }}</span>
-          <span class="sysinfo-value">{{ server.os || 'N/A' }}</span>
+          <span class="sysinfo-value sysinfo-small">{{ server.os || 'N/A' }}</span>
         </div>
         <div class="sysinfo-item">
           <span class="sysinfo-label">🔧 {{ trans.cpuInfo }}</span>
@@ -70,20 +74,16 @@
           <span class="sysinfo-value highlight">{{ server.load_avg || '0.00' }}</span>
         </div>
         <div class="sysinfo-item">
+          <span class="sysinfo-label">🌐 {{ trans.traffic }}</span>
+          <span class="sysinfo-value sysinfo-small">🔽 {{ formatBytes(server.net_rx) }} / 🔼 {{ formatBytes(server.net_tx) }}</span>
+        </div>
+        <div class="sysinfo-item">
           <span class="sysinfo-label">🕐 {{ trans.bootTime }}</span>
           <span class="sysinfo-value sysinfo-small">{{ formatBootTime(server.boot_time) }}</span>
         </div>
         <div class="sysinfo-item">
-          <span class="sysinfo-label">🔽 {{ trans.trafficIn }}</span>
-          <span class="sysinfo-value">{{ formatBytes(server.net_rx) }}</span>
-        </div>
-        <div class="sysinfo-item">
-          <span class="sysinfo-label">🔼 {{ trans.trafficOut }}</span>
-          <span class="sysinfo-value">{{ formatBytes(server.net_tx) }}</span>
-        </div>
-        <div class="sysinfo-item">
           <span class="sysinfo-label">⏰ {{ trans.lastReport }}</span>
-          <span class="sysinfo-value">{{ lastReportTime }}</span>
+          <span class="sysinfo-value sysinfo-small">{{ lastReportTime }}</span>
         </div>
       </div>
     </div>
@@ -301,6 +301,21 @@ const diskPercent = computed(() => (parseFloat(server.value.disk) || 0).toFixed(
 const lastReportTime = computed(() => {
   const lastUpdated = new Date(server.value.last_updated).getTime()
   return new Date(lastUpdated).toLocaleString(undefined, { hour12: false })
+})
+
+const isExpired = computed(() => {
+  if (!server.value.expire_date) return false
+  const expTime = new Date(server.value.expire_date).getTime()
+  return isNaN(expTime) ? false : expTime < Date.now()
+})
+
+const expireDaysText = computed(() => {
+  if (!server.value.expire_date) return ''
+  const expTime = new Date(server.value.expire_date).getTime()
+  if (isNaN(expTime)) return ''
+  const diff = expTime - Date.now()
+  const days = Math.ceil(diff / (1000 * 3600 * 24))
+  return days > 0 ? `${days}${trans.value.expireDays}` : trans.value.expired
 })
 
 const cpuChartRef = ref(null)
