@@ -4,7 +4,7 @@ const STORAGE_KEY = 'theme_preference'
 const AUTO_MODE_HOUR_START = 6
 const AUTO_MODE_HOUR_END = 18
 
-const currentTheme = ref('dark')
+const currentTheme = ref('auto')
 
 const resolveTheme = (theme) => {
   if (theme === 'auto') {

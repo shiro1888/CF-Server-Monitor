@@ -1,12 +1,10 @@
 # [CF-Server-Monitor](https://github.com/huilang-me/CF-Server-Monitor)
 
-**版本：V2.6.1**
+一个基于 Cloudflare Workers + D1 的多服务器监控探针系统，支持实时监控、历史数据查看、延迟追踪、地图展示等功能。兼容主流Linux系统，Alpine Linux，Windows系统。**演示地址**：<https://tz.dashdeep.dpdns.org/>
 
-V2.6.0降低了 **50%** 的D1写入消耗，强烈建议升级，升级后请在后台手动点击 **升级数据库** 或者 **重建数据库** 。
+**当前版本：V2.6.2**
 
-**演示地址**：<https://tz.dashdeep.dpdns.org/>
-
-一个基于 Cloudflare Workers + D1 的多服务器监控探针系统，支持实时监控、历史数据查看、延迟追踪、地图展示等功能。兼容主流Linux系统，Alpine Linux，Windows系统
+V2.6.0 降低了 **50%** 的D1写入消耗，强烈建议升级，升级后请在后台手动点击 **升级数据库** 或者 **重建数据库** 。
 
 ## ✨ 功能特点
 
@@ -32,8 +30,6 @@ V2.6.0降低了 **50%** 的D1写入消耗，强烈建议升级，升级后请在
 - [Cloudflare 账户](https://dash.cloudflare.com/)
 - [GitHub 账户](https://github.com/)
 
-
-
 <details>
 <summary>方式一：Cloudflare Workers 连接GitHub仓库（推荐使用，方便同步）</summary>
 
@@ -44,7 +40,7 @@ V2.6.0降低了 **50%** 的D1写入消耗，强烈建议升级，升级后请在
 ### 第二步：新建 Cloudflare Workers
 
 1. 登录 [Cloudflare 控制台](https://dash.cloudflare.com/)
-2. 进入 **Workers & Pages**
+2. 进入 **[Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages)**
 3. 点击 **Create application**
 4. 选择 Continue with GitHub（第一次使用需要连接 GitHub 账户），选择本项目
 5. Project Name填写：`cf-server-monitor`,小写即可，可按自己需求设置
@@ -54,7 +50,7 @@ V2.6.0降低了 **50%** 的D1写入消耗，强烈建议升级，升级后请在
 ### 第三步：配置环境变量
 
 1. 在当前Workers & Pages页面，点击 **Settings**
-2. 在Variables and secrets找到API_SECRET，点右侧编辑，填写密码（建议使用随机数），点Deploy保存部署，等待30秒左右部署完成
+2. 在Variables and secrets找到API_SECRET，点右侧编辑，填写密码（建议使用随机数,不要包含特殊字符比如%），点Deploy保存部署，等待30秒左右部署完成
 
 ### 第四步：获取 Worker URL
 
@@ -73,7 +69,7 @@ V2.6.0降低了 **50%** 的D1写入消耗，强烈建议升级，升级后请在
 ### 第二步：创建 D1 数据库
 
 1. 登录 [Cloudflare 控制台](https://dash.cloudflare.com/)
-2. 进入 **Workers & Pages** → **D1 SQL Database**
+2. 进入 **[Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages)**  → **[D1 SQL Database](https://dash.cloudflare.com/?to=/:account/workers/d1)**
 3. 点击 **Create database**
 4. 数据库名称填写：`server-monitor-db`
 5. 点击 **Create**
@@ -85,13 +81,13 @@ V2.6.0降低了 **50%** 的D1写入消耗，强烈建议升级，升级后请在
 
 **方式一：从右侧面板获取**
 
-1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com/)
+1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
 2. 在右侧面板找到 **Account ID**
 3. 复制保存
 
 **方式二：从 URL 中获取**
 
-- 登录后访问任意 Cloudflare 页面，例如 `https://dash.cloudflare.com/f81d307ba09470a84732724694435c9c4c4c/workers-and-pages`
+- 登录后访问任意 Cloudflare 页面，例如 [Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
 - URL 中 `dash.cloudflare.com/` 之后的那串字符就是 Account ID
 
 #### 获取 API Token
@@ -114,7 +110,7 @@ V2.6.0降低了 **50%** 的D1写入消耗，强烈建议升级，升级后请在
 | `CF_API_TOKEN`   | 第三步获取的 Token       | Cloudflare API 令牌          |
 | `CF_ACCOUNT_ID`  | 第三步获取的 ID          | Cloudflare 账户 ID           |
 | `API_USER_NAME`  | 自定义用户名（非必填）        | 管理后台用户名 新版已移除，默认用户名admin   |
-| `API_SECRET`     | API 认证密钥（必填）       | 探针认证密钥 & 默认管理后台密码 建议使用随机密码 |
+| `API_SECRET`     | API 认证密钥（必填）       | 探针认证密钥 & 默认管理后台密码 建议使用随机密码,不要包含特殊字符比如% |
 | `D1_DATABASE_ID` | 第二步获取的 Database ID | D1 数据库 ID                  |
 
 ### 第五步：部署
@@ -152,13 +148,13 @@ git push origin main
 </details>
 
 <details>
-<summary>方式三：一键部署</summary>
+<summary>方式三：一键部署（比较简单，但不推荐，不方便更新）</summary>
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/huilang-me/CF-Server-Monitor)
 
 新用户点击一键部署
 
-修改`API_SECRET`，建议使用随机密码，登录密码在登录后修改，建议和API\_SECRET不同。
+修改`API_SECRET`，建议使用随机密码,不要包含特殊字符比如%，登录密码在登录后修改，建议和API\_SECRET不同。
 
 在build command中填入 `npm run build:frontend`，其他保持默认
 
@@ -550,10 +546,40 @@ npm run deploy
 
 ```
 node test/generate-sql.js
-wrangler d1 execute server-monitor-db --local --file=test/mock-data.sql
+wrangler d1 execute server-monitor-db --file=test/mock-data.sql
 ```
 
 详细步骤见 [test/README.md](test/README.md)
+
+### API 接口测试
+
+项目提供了 `api-check.js` 接口测试工具，用于验证本地开发环境的 API 接口是否正常工作：
+
+```bash
+# 默认配置测试
+node test/api-check.js
+
+# 指定参数测试
+node test/api-check.js --base-url=http://localhost:8787 --api-secret=123456
+
+# 查看帮助
+node test/api-check.js --help
+```
+
+**测试覆盖范围：**
+- 未登录接口：`/api/config`、`/api/servers`、`/api/server`、`/update` 等
+- 登录流程：登录接口验证
+- 已登录接口：隐藏服务器访问、历史数据查询等
+- 后台管理：服务器增删改查、设置管理等
+
+**选项参数：**
+| 参数 | 说明 | 默认值 |
+| --- | --- | --- |
+| `--base-url` | 本地服务地址 | `http://localhost:8787` |
+| `--api-secret` | API_SECRET | `123456` |
+| `--admin-user` | 管理员用户名 | `admin` |
+| `--admin-password` | 管理员密码 | 使用 API_SECRET |
+| `--timeout` | 请求超时时间(ms) | `10000` |
 
 </details>
 

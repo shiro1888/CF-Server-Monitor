@@ -124,14 +124,13 @@ safe_div() {
     if [ "${den}" -eq 0 ]; then echo "${def}"; else echo $(( num / den )); fi
 }
 
-get_net_bytes() { 
-    awk 'NR>2 {rx+=$2; tx+=$10} END {printf "%.0f %.0f", rx, tx}' /proc/net/dev 2>/dev/null || echo "0 0"
+get_net_bytes() {
+    awk 'NR>2{rx+=$2;tx+=$10}END{printf "%.0f %.0f\n",rx,tx}' /proc/net/dev 2>/dev/null || echo "0 0";
 }
 
-get_cpu_stat() { 
-    awk '/^cpu / {print $2+$3+$4+$5+$6+$7+$8+$9, $5+$6}' /proc/stat 2>/dev/null || echo "0 0"
+get_cpu_stat() {
+    awk '/^cpu /{total=$2+$3+$4+$5+$6+$7+$8+$9;idle=$5+$6;printf "%.0f %.0f\n",total,idle}' /proc/stat 2>/dev/null || echo "0 0";
 }
-
 
 get_http_ping() { 
     local rtt

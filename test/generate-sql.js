@@ -81,7 +81,7 @@ const servers = [
     expire_date: '2026-06-30',
     bandwidth: '500Mbps',
     traffic_limit: '1TB',
-    is_hidden: '0',
+    is_hidden: '1',
     sort_order: 1
   }
 ];
@@ -107,7 +107,7 @@ const appearanceOptions = {
 };
 
 const siteOptions = {
-  is_public: 'false',
+  is_public: 'true',
   show_price: 'true',
   show_expire: 'true',
   show_bw: 'true',
@@ -185,7 +185,7 @@ fs.writeFileSync(outputPath, sql);
 console.log('✅ SQL 文件生成成功:', outputPath);
 console.log('\n📝 使用说明:');
 console.log('  1. 确保你有 wrangler.toml 配置好 D1 数据库');
-console.log('  2. 创建本地 D1 数据库: wrangler d1 create server-monitor-db --local');
+console.log('  2. 创建本地 D1 数据库: wrangler d1 create server-monitor-db');
 console.log('  3. 初始化数据库结构（如果还没）: 访问一次 http://localhost:8787');
-console.log('  4. 或者直接执行 SQL: wrangler d1 execute server-monitor-db --local --file=test/mock-data.sql');
+console.log('  4. 或者直接执行 SQL: wrangler d1 execute server-monitor-db --file=test/mock-data.sql');
 console.log('  5. 然后运行: npm run dev');

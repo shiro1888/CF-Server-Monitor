@@ -256,13 +256,7 @@ export default {
         return handleServersAPI(request, env, sys);
       }},
       { method: 'GET', path: '/api/ws', handler: async () => handleWebSocketUpgrade(request, env) },
-      { method: 'GET', path: '/api/history', handler: async () => {
-        await ensureSiteSettings();
-        const id = url.searchParams.get('id');
-        const metric = url.searchParams.get('metric') || 'cpu';
-        const hours = parseFloat(url.searchParams.get('hours') || '24');
-        return fetchHistoryData(env, request, id, hours, metric, sys);
-      }},
+
       { method: 'GET', path: '/api/history/all', handler: async () => {
         await ensureSiteSettings();
         const id = url.searchParams.get('id');

@@ -9,7 +9,6 @@
 
 const SERVERS_LIST_TTL = 60 * 1000;
 let serversListCache = null;
-let serversListCacheTime = 0;
 
 const SERVER_DETAIL_TTL = 5 * 60 * 1000;
 const serverDetailCache = new Map();
@@ -44,7 +43,6 @@ export async function getAllServers(db, includeHidden = true) {
 
 export function clearServersListCache() {
   serversListCache = null;
-  serversListCacheTime = 0;
 }
 
 /**

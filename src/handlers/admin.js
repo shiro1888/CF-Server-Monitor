@@ -424,29 +424,6 @@ export async function handleAdminAPI(request, env, sys) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    else if (data.action === 'clean_history') {
-      const days = data.days || 7;
-      if (typeof days !== 'number' || days < 1 || days > 365) {
-        return new Response(JSON.stringify({ error: '天数参数无效' }), { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      
-      await env.DB.prepare(
-        `DELETE FROM metrics_history WHERE timestamp < datetime('now', '-' || ? || ' days')`
-      ).bind(days).run();
-      
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: {
-          en: `Cleaned history data older than ${days} days`,
-          zh: `已清理 ${days} 天前的历史数据`
-        }
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
     
     return new Response(JSON.stringify({ error: '未知操作' }), { 
       status: 400,
