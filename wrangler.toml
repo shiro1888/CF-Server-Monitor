@@ -1,8 +1,14 @@
-# Cloudflare Workers 配置，线上已由deploy.yml接管，这里仅供本地测试
-name = "cf-server-monitor"
+# Cloudflare Workers 配置
+name = "prod-watch-core"
 main = "src/index.js"
-compatibility_date = "2024-12-01"
+compatibility_date = "2026-06-26"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = "probe.shiro1888.com"
+custom_domain = true
 
 # 定时任务配置（UTC）
 # - 每分钟：执行离线节点检测
@@ -17,7 +23,8 @@ binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "server-monitor-db"
+database_name = "prod-watch-db"
+database_id = "71afa248-e906-486e-afff-3ae3b88c070a"
 
 # Durable Objects：实时指标广播中心
 # 注意：首次部署前需要执行 `wrangler durable-object create MetricsBroadcaster --class MetricsBroadcaster`
@@ -25,7 +32,6 @@ database_name = "server-monitor-db"
 [[durable_objects.bindings]]
 name = "METRICS_BROADCASTER"
 class_name = "MetricsBroadcaster"
-script_name = "cf-server-monitor"
 
 [[migrations]]
 tag = "v1"
