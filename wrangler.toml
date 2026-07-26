@@ -10,12 +10,22 @@ preview_urls = false
 pattern = "probe.shiro1888.com"
 custom_domain = true
 
+keep_vars = true
+
 # 定时任务配置（UTC）
-# - 每分钟：执行离线节点检测
+# - 每2分钟：执行离线节点检测
+#   （2026-07-27 由 */1 改为 */2 以降低请求量：1440/天 -> 720/天。
+#    离线判定阈值是硬编码的 300000ms/5分钟，与本 cron 间隔无关，
+#    所以最坏告警延迟只从 ~6 分钟变为 ~7 分钟。
+#    阈值位置（已按上游 146 个提交合并后校正）：
+#      src/frontend/utils/constants.js:4  ONLINE_THRESHOLD_MS
+#      src/handlers/dashboard.js:134
+#      src/handlers/admin.js:411
+#    原注释引用的 src/services/notification.js 在上游重构后已不含该阈值。）
 # - 每小时：合并执行其他定时任务（每月1号数据清理、每月8号清理旧表、每天12点服务器到期检测）
 # - 注意同步修改deploy和index.js scheduled函数里面的值
 [triggers]
-crons = ["*/1 * * * *", "0 * * * *"]
+crons = ["*/2 * * * *", "0 * * * *"]
 
 [assets]
 directory = "./dist"
@@ -36,9 +46,6 @@ class_name = "MetricsBroadcaster"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["MetricsBroadcaster"]
-
-[vars]
-CORS_ALLOWED_ORIGINS = ""
 
 # 开发服务器配置
 [dev]

@@ -1,5 +1,6 @@
 const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' };
-import { md5Hash } from '../utils/common.js';
+import { verifyPasswordHash } from '../utils/common.js';
+import { isValidJwtSecret } from '../utils/settings.js';
 
 async function generateKeyFromSecret(secret) {
   const encoder = new TextEncoder();
@@ -61,14 +62,12 @@ async function verifyJwt(token, secret) {
 }
 
 function getJwtSecret(env, sys) {
-  if (sys && sys.jwt_secret && sys.jwt_secret.length >= 32) {
+  if (isValidJwtSecret(sys?.jwt_secret)) {
     return sys.jwt_secret;
   }
-  
+
   const fallback = env.API_SECRET || 'default_jwt_secret_for_server_monitor';
-  const padded = fallback.padEnd(32, 'x');
-  
-  return padded.substring(0, 64);
+  return fallback.padEnd(32, 'x').substring(0, 64);
 }
 
 export async function generateToken(env, sys) {
@@ -77,7 +76,7 @@ export async function generateToken(env, sys) {
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 604800
   };
-  
+
   const secret = getJwtSecret(env, sys);
   return signJwt(payload, secret);
 }
@@ -97,7 +96,7 @@ export async function checkAuth(request, env, sys) {
   }
 
   const secret = getJwtSecret(env, sys);
-  
+
   try {
     const payload = await verifyJwt(token, secret);
     return payload !== null;
@@ -111,7 +110,7 @@ export async function validateCredentials(request, env, sys) {
   try {
     const authHeader = request.headers.get('Authorization');
     if (!authHeader) {
-      return false;
+      return { valid: false, needsPasswordUpgrade: false };
     }
 
     const parts = authHeader.trim().split(/\s+/);
@@ -119,19 +118,19 @@ export async function validateCredentials(request, env, sys) {
     const encoded = parts[1];
 
     if (scheme !== 'Basic' || !encoded) {
-      return false;
+      return { valid: false, needsPasswordUpgrade: false };
     }
 
     let decoded;
     try {
       decoded = atob(encoded);
     } catch (e) {
-      return false;
+      return { valid: false, needsPasswordUpgrade: false };
     }
 
     const idx = decoded.indexOf(':');
     if (idx === -1) {
-      return false;
+      return { valid: false, needsPasswordUpgrade: false };
     }
 
     const username = decoded.slice(0, idx);
@@ -144,19 +143,27 @@ export async function validateCredentials(request, env, sys) {
         : 'admin';
 
     if (sys && sys.password && sys.password.length > 0) {
-      const hashedPassword = await md5Hash(password);
-      return username === validUsername && hashedPassword === sys.password;
+      if (username !== validUsername) {
+        return { valid: false, needsPasswordUpgrade: false };
+      }
+
+      const result = await verifyPasswordHash(password, sys.password);
+      return {
+        valid: result.valid,
+        needsPasswordUpgrade: result.needsRehash === true
+      };
     }
 
-    return (
+    const valid = (
       typeof env.API_SECRET === 'string' &&
       env.API_SECRET.length > 0 &&
       username === validUsername &&
       password === env.API_SECRET
     );
+    return { valid, needsPasswordUpgrade: false };
   } catch (e) {
     console.error('Credential validation error:', e);
-    return false;
+    return { valid: false, needsPasswordUpgrade: false };
   }
 }
 

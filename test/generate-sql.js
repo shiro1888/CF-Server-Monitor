@@ -29,12 +29,10 @@ function generateMetrics(baseTimestamp, serverIdx, hourOffset) {
   
   return {
     cpu: cpu.toFixed(2),
-    ram: ram.toFixed(2),
     ram_total: ramTotal.toString(),
     ram_used: Math.floor(ramUsed).toString(),
     swap_total: '8192',
     swap_used: Math.floor(Math.random() * 512).toString(),
-    disk: (45 + (Math.random() - 0.5) * 5).toFixed(0),
     disk_total: (serverIdx === 0 ? 200 : 100).toString(),
     disk_used: '90',
     load_avg: `${(baseline.load_avg + (Math.random() - 0.5) * 0.8).toFixed(2)} ${(baseline.load_avg + (Math.random() - 0.5) * 0.6).toFixed(2)} ${(baseline.load_avg + (Math.random() - 0.5) * 0.4).toFixed(2)}`,
@@ -43,10 +41,10 @@ function generateMetrics(baseTimestamp, serverIdx, hourOffset) {
     net_rx_monthly: Math.floor(Math.random() * 1000000000 + 500000000).toString(),
     net_tx_monthly: Math.floor(Math.random() * 500000000 + 250000000).toString(),
     net_in_speed: Math.floor(Math.random() * 10000000 + 20).toString(),
-    net_out_speed: Math.floor(Math.random() * 20000000 + 10).toString(),
+    net_out_speed: Math.floor(Math.random() * 10).toString(),
     processes: (100 + Math.floor(Math.random() * 50)).toString(),
-    tcp_conn: (50 + Math.floor(Math.random() * 100)).toString(),
-    udp_conn: (10 + Math.floor(Math.random() * 30)).toString(),
+    tcp_conn: (Math.floor(Math.random() * 100)).toString(),
+    udp_conn: (Math.floor(Math.random() * 3)).toString(),
     ping_ct: Math.round(Math.max(10, baseline.ping * 1.2 + pingNoise)).toString(),
     ping_cu: Math.round(Math.max(10, baseline.ping + pingNoise)).toString(),
     ping_cm: Math.round(Math.max(10, baseline.ping * 1.1 + pingNoise)).toString(),
@@ -63,7 +61,8 @@ function generateMetrics(baseTimestamp, serverIdx, hourOffset) {
     gpu_info: serverIdx === 0 ? 'NVIDIA Tesla T4' : 'AMD Radeon Pro V620',
     arch: 'x86_64',
     os: serverIdx === 0 ? 'Ubuntu 22.04 LTS' : 'Debian 12',
-    boot_time: (Date.now() - (serverIdx === 0 ? 86400000 * 600 : 86400000 * 15)).toString()
+    boot_time: (Date.now() - (serverIdx === 0 ? 86400000 * 600 : 86400000 * 15)).toString(),
+    region: serverIdx === 0 ? 'US' : 'JP',
   };
 }
 
@@ -74,9 +73,13 @@ const servers = [
     id: '550e8400-e29b-41d4-a716-446655440001',
     name: 'US-East-Fast',
     server_group: 'Production',
-    price: '$15/mo',
+    tags: 'production,us-east,edge',
+    note: 'Primary production node',
+    price: '15.00',
+    billing_cycle: 'month',
+    auto_renewal: '1',
+    currency: '$',
     expire_date: '2026-12-31',
-    bandwidth: '1Gbps',
     traffic_limit: '2TB',
     is_hidden: '0',
     sort_order: 0
@@ -85,9 +88,13 @@ const servers = [
     id: '550e8400-e29b-41d4-a716-446655440002',
     name: 'JP-Tokyo-Stable',
     server_group: 'Production',
-    price: '$10/mo',
+    tags: 'production,jp-tokyo',
+    note: 'Hidden standby node',
+    price: '10.00',
+    billing_cycle: 'month',
+    auto_renewal: '0',
+    currency: '$',
     expire_date: '2026-06-30',
-    bandwidth: '500Mbps',
     traffic_limit: '1TB',
     is_hidden: '1',
     sort_order: 1
@@ -98,10 +105,81 @@ let sql = `-- CF Server Monitor 模拟数据
 -- 生成时间: ${new Date().toISOString()}
 
 -- 清空现有数据（注意顺序：先删子表，再删主表）
-DELETE FROM metrics_history;
+DROP TABLE IF EXISTS metrics_history;
 DROP TABLE IF EXISTS metrics_history_old;
-DELETE FROM servers;
-DELETE FROM settings;
+DROP TABLE IF EXISTS servers;
+DROP TABLE IF EXISTS settings;
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY, 
+  value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS servers (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  server_group TEXT DEFAULT 'Default',
+  tags TEXT DEFAULT '',
+  note TEXT DEFAULT '',
+  price TEXT DEFAULT '',
+  billing_cycle TEXT DEFAULT 'month',
+  auto_renewal TEXT DEFAULT '0',
+  currency TEXT DEFAULT '¥',
+  expire_date TEXT DEFAULT '',
+  traffic_limit TEXT DEFAULT '',
+  traffic_calc_type TEXT DEFAULT 'total',
+  reset_day INTEGER DEFAULT 1,
+  collect_interval INTEGER DEFAULT 0,
+  report_interval INTEGER DEFAULT 60,
+  auto_update TEXT DEFAULT '0',
+  is_hidden TEXT DEFAULT '0',
+  sort_order INTEGER DEFAULT 0
+);
+
+-- 这里模拟不插入history_partition_id和timestamp
+
+CREATE TABLE IF NOT EXISTS metrics_history (
+  id INTEGER PRIMARY KEY,
+  server_id TEXT NOT NULL,
+  timestamp INTEGER DEFAULT 0,
+  cpu REAL DEFAULT 0,
+  load_avg TEXT DEFAULT '0',
+  net_in_speed REAL DEFAULT 0,
+  net_out_speed REAL DEFAULT 0,
+  net_rx REAL DEFAULT 0,
+  net_tx REAL DEFAULT 0,
+  processes INTEGER DEFAULT 0,
+  tcp_conn INTEGER DEFAULT 0,
+  udp_conn INTEGER DEFAULT 0,
+  ping_ct INTEGER DEFAULT 0,
+  ping_cu INTEGER DEFAULT 0,
+  ping_cm INTEGER DEFAULT 0,
+  ping_bd INTEGER DEFAULT 0,
+  loss_ct INTEGER DEFAULT NULL,
+  loss_cu INTEGER DEFAULT NULL,
+  loss_cm INTEGER DEFAULT NULL,
+  loss_bd INTEGER DEFAULT NULL,
+  ram_total REAL DEFAULT 0,
+  ram_used REAL DEFAULT 0,
+  swap_total REAL DEFAULT 0,
+  swap_used REAL DEFAULT 0,
+  disk_total REAL DEFAULT 0,
+  disk_used REAL DEFAULT 0,
+  cpu_cores INTEGER DEFAULT 0,
+  cpu_info TEXT DEFAULT '',
+  gpu REAL DEFAULT NULL,
+  gpu_info TEXT DEFAULT '',
+  arch TEXT DEFAULT '',
+  os TEXT DEFAULT '',
+  region TEXT DEFAULT '',
+  ip_v4 TEXT DEFAULT '0',
+  ip_v6 TEXT DEFAULT '0',
+  boot_time TEXT DEFAULT '',
+  net_rx_monthly REAL DEFAULT 0,
+  net_tx_monthly REAL DEFAULT 0,
+  FOREIGN KEY (server_id) REFERENCES servers(id)
+);
+-- 模拟外键
 
 -- 插入系统配置
 `;
@@ -110,16 +188,20 @@ const appearanceOptions = {
   site_title: 'Test',
   custom_bg: 'https://cdn.nodeimage.com/i/fux0OSoFzVZQsn9uZmSDbIpKzZw2r8GW.webp',
   custom_head: '<meta content="test">',
-  custom_script: 'console.log("Hello, World!");'
+  custom_script: 'console.log("Hello, World!");',
+  display_mode: 'bar',
+  theme_options: { a: 1, b: 2 }
 };
 
 const siteOptions = {
+  username: 'admin',
   is_public: 'true',
   show_price: 'true',
   show_expire: 'true',
-  show_bw: 'true',
   show_tf: 'true',
-  tg_notify: 'false',
+  show_time: 'true',
+  show_long_history: 'true',
+  tg_notify: '0',
   tg_bot_token: '',
   tg_chat_id: '',
   turnstile_site_key: '0x4AAAAAADnx_ErgRBFcm5Il'
@@ -134,10 +216,11 @@ const serverLatestMetrics = {};
 
 for (const server of servers) {
   sql += `INSERT INTO servers (
-    id, name, server_group, price, expire_date, bandwidth, traffic_limit, is_hidden, sort_order
+    id, name, server_group, tags, note, price, billing_cycle, auto_renewal, currency, expire_date, traffic_limit, is_hidden, sort_order
   ) VALUES (
-    '${server.id}', '${server.name}', '${server.server_group}', '${server.price}', 
-    '${server.expire_date}', '${server.bandwidth}', '${server.traffic_limit}', 
+    '${server.id}', '${server.name}', '${server.server_group}', '${server.tags}', '${server.note}', '${server.price}',
+    '${server.billing_cycle}', '${server.auto_renewal}', '${server.currency}',
+    '${server.expire_date}', '${server.traffic_limit}',
     '${server.is_hidden}', ${server.sort_order}
   );\n`;
 }
@@ -196,7 +279,7 @@ for (let s = 0; s < servers.length; s++) {
 
     rows.push(`
 INSERT INTO metrics_history (
-  server_id, timestamp, cpu, ram, disk, load_avg,
+  server_id, timestamp, cpu, load_avg,
   net_in_speed, net_out_speed, net_rx, net_tx,
   processes, tcp_conn, udp_conn,
   ping_ct, ping_cu, ping_cm, ping_bd,
@@ -205,13 +288,12 @@ INSERT INTO metrics_history (
   disk_total, disk_used,
   cpu_cores, cpu_info, gpu, gpu_info, arch, os,
   ip_v4, ip_v6, boot_time,
-  net_rx_monthly, net_tx_monthly
+  net_rx_monthly, net_tx_monthly,
+  region
 ) VALUES (
   '${server.id}',
   ${ts},
   ${parseFloat(metrics.cpu)},
-  ${parseFloat(metrics.ram)},
-  ${parseFloat(metrics.disk)},
   '${metrics.load_avg}',
   ${parseFloat(metrics.net_in_speed)},
   ${parseFloat(metrics.net_out_speed)},
@@ -244,7 +326,8 @@ INSERT INTO metrics_history (
   '${metrics.ip_v6}',
   '${metrics.boot_time}',
   ${parseFloat(metrics.net_rx_monthly)},
-  ${parseFloat(metrics.net_tx_monthly)}
+  ${parseFloat(metrics.net_tx_monthly)},
+  '${metrics.region}'
 );
 `);
 

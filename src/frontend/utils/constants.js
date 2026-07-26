@@ -1,3 +1,5 @@
+export const DEFAULT_SITE_TITLE = 'Cloudflare Server Monitor'
+
 export const TIME = {
   ONLINE_THRESHOLD_MS: 300000,
   POLL_INTERVAL_MS: 60000,
@@ -12,14 +14,6 @@ export const CHART = {
   ANIMATION_DURATION: 300,
   MAX_TICKS: 8,
   MAX_TICKS_HOUR: 12
-}
-
-export const GAP_BREAK = {
-  LESS_THAN_1_HOUR: 5 * 60 * 1000,
-  LESS_THAN_6_HOURS: 10 * 60 * 1000,
-  LESS_THAN_12_HOURS: 15 * 60 * 1000,
-  LESS_THAN_24_HOURS: 20 * 60 * 1000,
-  MORE_THAN_24_HOURS: 30 * 60 * 1000
 }
 
 export const PING = {
@@ -52,7 +46,6 @@ export const COLORS = {
 export default {
   TIME,
   CHART,
-  GAP_BREAK,
   PING,
   STORAGE,
   STATUS,

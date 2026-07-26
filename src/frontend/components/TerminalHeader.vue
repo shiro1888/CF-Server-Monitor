@@ -43,7 +43,8 @@
           >☀</button>
         </div>
       </div>
-      <router-link :to="isAdminPage ? '/' : '/admin'" class="admin-link-header">⚙ {{ isAdminPage ? t('dashboard') : t('admin') }}</router-link>
+      <a v-if="isAdminPage" href="/#/" class="admin-link-header">⚙ {{ t('dashboard') }}</a>
+      <a v-else href="/admin#admin" class="admin-link-header">⚙ {{ t('admin') }}</a>
     </div>
   </div>
 </template>
@@ -53,11 +54,12 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { t, setLanguage, getLanguage } from '../utils/i18n'
 import { useTheme } from '../composables/useTheme'
+import { DEFAULT_SITE_TITLE } from '../utils/constants'
 
 defineProps({
   title: {
     type: String,
-    default: 'Server Monitor'
+    default: DEFAULT_SITE_TITLE
   }
 })
 

@@ -1,27 +1,123 @@
 import { saveMetricsHistory } from '../database/schema.js';
-import { checkServerExists } from '../utils/cache.js';
+import { getServerDetail, clearServerDetailCache } from '../utils/cache.js';
 import { mergeMetricsIntoServer } from '../utils/metrics.js';
-import { createErrorResponse, createUnauthorizedResponse, createNotFoundResponse } from '../utils/errors.js';
+import { createErrorResponse, createUnauthorizedResponse, createNotFoundResponse, createBadRequestResponse } from '../utils/errors.js';
+import { ensureServerOptimization } from '../database/indexOptimization.js';
+import { AGENT_VERSION, loadSiteSettings } from '../utils/settings.js';
+import { cacheLatestReportUpdate } from '../utils/latestReportCache.js';
+import {
+  AGENT_CONFIG_MD5_HEADER,
+  AGENT_CONFIG_SCHEMA_HEADER,
+  AGENT_CONFIG_SCHEMA_VERSION,
+  appendAgentUpdateParam,
+  describeAgentConfig,
+  isAgentAutoUpdateEnabled,
+  isValidTrafficCorrection,
+  serializeCorrection,
+  shouldSendAgentUpdate
+} from '../utils/agentConfig.js';
 
 // 将最新一次上报打包成前端可直接消费的 "当前状态" 对象
 // 与 /api/server 和 /api/servers 返回的字段保持一致，便于页面直接合并
-function buildPayloadForBroadcast(id, metrics, extra = {}) {
+function buildPayloadForBroadcast(id, metrics = {}, extra = {}) {
   const payload = {};
   mergeMetricsIntoServer(payload, metrics);
   payload.id = id;
   payload.region = extra.region || '';
-  payload.last_updated = metrics.timestamp || Date.now();
+  payload.agent_version = extra.agentVersion || metrics.agent_version || '';
+  payload.last_updated = extra.timestamp || metrics.timestamp || Date.now();
   payload.timestamp = payload.last_updated;
   return payload;
 }
 
 // 批量推送：5秒窗口内合并向 DO 推送一次，减少请求次数
 const BATCH_WINDOW = 5000;
+const MAX_BATCH_SAMPLES = 300;
 let batchQueue = new Map();
 let flushingPromise = null;
 
 // 用于过滤不需要实时更新的字段
-const BROADCAST_DELETE_FIELDS = ['id', 'name', 'region', 'arch', 'os', 'cpu_info', 'cpu_cores', 'gpu_info', 'expire_date', 'server_group', 'traffic_limit', 'net_rx_monthly', 'net_tx_monthly', 'boot_time', 'timestamp', 'ip_v4', 'ip_v6'];
+const BROADCAST_DELETE_FIELDS = ['id', 'name', 'region', 'arch', 'os', 'cpu_info', 'cpu_cores', 'expire_date', 'server_group', 'traffic_limit', 'net_rx_monthly', 'net_tx_monthly', 'boot_time', 'timestamp', 'ip_v4', 'ip_v6'];
+
+function normalizeTimestamp(value, fallback = Date.now()) {
+  const ts = Number(value);
+  if (!Number.isFinite(ts) || ts <= 0) return fallback;
+  return ts < 10000000000 ? ts * 1000 : ts;
+}
+
+function normalizeAgentVersion(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .trim()
+    .replace(/[^0-9A-Za-z.+_-]/g, '')
+    .slice(0, 64);
+}
+
+function createAgentInstructionResponse(body) {
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'Cache-Control': 'no-store',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
+    }
+  });
+}
+
+function logUpdateBadRequest(reason, details = {}) {
+  console.warn('[Update] 400 Bad Request:', reason, details);
+}
+
+function normalizeCorrectionValue(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  return isValidTrafficCorrection(value) ? Number(value) : null;
+}
+
+function normalizeMetricSamples(data) {
+  const now = Date.now();
+  const rawSamples = Array.isArray(data.samples)
+    ? data.samples
+    : (Array.isArray(data.batch) ? data.batch : []);
+
+  const samples = rawSamples.map(item => {
+    if (!item || typeof item !== 'object') return null;
+    const metrics = item.metrics || item.data || item.payload || item;
+    if (!metrics || typeof metrics !== 'object') return null;
+    const ts = normalizeTimestamp(item.ts ?? item.timestamp ?? metrics.timestamp, now);
+    return { ts, metrics };
+  }).filter(Boolean);
+
+  if (samples.length === 0 && data.metrics && typeof data.metrics === 'object') {
+    samples.push({
+      ts: normalizeTimestamp(data.metrics.timestamp, now),
+      metrics: data.metrics
+    });
+  }
+
+  samples.sort((a, b) => a.ts - b.ts);
+  return samples.slice(-MAX_BATCH_SAMPLES);
+}
+
+function toBroadcastSamples(id, samples, regionCode, agentVersion = '') {
+  return samples.map(sample => {
+    const payload = buildPayloadForBroadcast(id, sample.metrics || {}, {
+      region: regionCode,
+      agentVersion,
+      timestamp: sample.ts
+    });
+    const filtered = Object.assign({}, payload);
+    BROADCAST_DELETE_FIELDS.forEach(field => delete filtered[field]);
+    return { ts: sample.ts, payload: filtered };
+  });
+}
+
+function queueBroadcastSamples(serverId, samples) {
+  if (!serverId || !Array.isArray(samples) || samples.length === 0) return;
+  const existing = batchQueue.get(serverId);
+  const merged = existing && Array.isArray(existing.samples)
+    ? existing.samples.concat(samples)
+    : samples;
+  batchQueue.set(serverId, { samples: merged.slice(-MAX_BATCH_SAMPLES) });
+}
 
 async function _flushBatch(env) {
   flushingPromise = null;
@@ -33,10 +129,14 @@ async function _flushBatch(env) {
   batchQueue = new Map();
 
   const updates = [];
-  for (const [serverId, payload] of queue) {
-    const filtered = Object.assign({}, payload);
-    BROADCAST_DELETE_FIELDS.forEach(field => delete filtered[field]);
-    updates.push({ serverId, payload: filtered });
+  for (const [serverId, item] of queue) {
+    if (item && Array.isArray(item.samples) && item.samples.length > 0) {
+      updates.push({ serverId, samples: item.samples });
+    } else if (item) {
+      const filtered = Object.assign({}, item);
+      BROADCAST_DELETE_FIELDS.forEach(field => delete filtered[field]);
+      updates.push({ serverId, payload: filtered });
+    }
   }
 
   if (updates.length === 0) return;
@@ -66,28 +166,147 @@ function _ensureBatchFlush(env) {
 export async function handleUpdate(request, env, ctx) {
   try {
     const data = await request.json();
-    const { id, secret, metrics } = data;
+    const { id, secret } = data;
 
     if (secret !== env.API_SECRET) {
       return createUnauthorizedResponse('Invalid secret');
     }
 
     let regionCode = request.cf?.country || request.headers?.get('cf-ipcountry') || '';
+    const agentVersion = normalizeAgentVersion(request.headers.get('X-Agent-Version'));
 
-    const serverExists = await checkServerExists(env.DB, id);
+    const serverDetail = await getServerDetail(env.DB, id, true);
 
-    if (!serverExists) {
+    if (!serverDetail) {
       return createNotFoundResponse('Server not found');
     }
 
-    await saveMetricsHistory(env.DB, id, metrics, regionCode);
+    if (
+      Object.prototype.hasOwnProperty.call(data, 'rx_correction') ||
+      Object.prototype.hasOwnProperty.call(data, 'tx_correction')
+    ) {
+      const ackRx = normalizeCorrectionValue(data.rx_correction);
+      const ackTx = normalizeCorrectionValue(data.tx_correction);
+      if (ackRx === null || ackTx === null) {
+        return createBadRequestResponse('Invalid correction');
+      }
 
-    const payload = buildPayloadForBroadcast(id, metrics || {}, { region: regionCode });
+      await env.DB.prepare(`
+        UPDATE servers
+        SET rx_correction = NULL, tx_correction = NULL
+        WHERE id = ?
+          AND (rx_correction IS NOT NULL OR tx_correction IS NOT NULL)
+          AND ABS(COALESCE(rx_correction, 0) - ?) < 0.000001
+          AND ABS(COALESCE(tx_correction, 0) - ?) < 0.000001
+      `).bind(id, ackRx, ackTx).run();
+      clearServerDetailCache();
+
+      return new Response('OK', {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
+    }
+
+    // 从缓存中获取历史记录分区 ID
+    const historyPartitionId = serverDetail.history_partition_id;
+    if(!historyPartitionId) {
+      await ensureServerOptimization(env.DB, id);
+      logUpdateBadRequest('Missing history_partition_id', {
+        id,
+        history_partition_id: serverDetail.history_partition_id
+      });
+      return createBadRequestResponse('Missing history_partition_id');
+    }
+
+    const samples = normalizeMetricSamples(data);
+    if (samples.length === 0) {
+      logUpdateBadRequest('Missing metrics', {
+        id,
+        has_metrics: !!data.metrics,
+        has_samples: Array.isArray(data.samples),
+        has_batch: Array.isArray(data.batch)
+      });
+      return createBadRequestResponse('Missing metrics');
+    }
+
+    // 获取最后一条插入（如果是批量数据，取最后一个样本）
+    const latestSample = samples[samples.length - 1];
+    await saveMetricsHistory(
+      env.DB,
+      id,
+      historyPartitionId,
+      latestSample.metrics,
+      regionCode,
+      latestSample.ts,
+      agentVersion
+    );
+
+    const broadcastSamples = toBroadcastSamples(id, samples, regionCode, agentVersion);
+    cacheLatestReportUpdate(id, broadcastSamples, Date.now());
     // 加入批量队列，由后台定时任务统一推送到 DO
-    batchQueue.set(id, payload);
+    queueBroadcastSamples(id, broadcastSamples);
     ctx.waitUntil(_ensureBatchFlush(env));
 
-    return new Response('OK', { status: 200 });
+    let shouldUpdateAgent = false;
+    const autoUpdateRequested = isAgentAutoUpdateEnabled(serverDetail.auto_update) && !!agentVersion;
+    if (autoUpdateRequested) {
+      const targetAgentVersion = normalizeAgentVersion(AGENT_VERSION || '');
+      shouldUpdateAgent = shouldSendAgentUpdate(agentVersion, targetAgentVersion);
+    }
+
+    const clientConfigSchema = request.headers.get(AGENT_CONFIG_SCHEMA_HEADER);
+    if (clientConfigSchema !== String(AGENT_CONFIG_SCHEMA_VERSION)) {
+      if (shouldUpdateAgent) {
+        return createAgentInstructionResponse('update=1');
+      }
+      return new Response('OK', {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
+    }
+
+    try {
+      const settings = await loadSiteSettings(env.DB);
+      const descriptor = await describeAgentConfig(serverDetail, settings);
+      const clientConfigMd5 = (request.headers.get(AGENT_CONFIG_MD5_HEADER) || '').trim().toLowerCase();
+      const hasCorrection = descriptor.correction !== null;
+      const md5Changed = clientConfigMd5 !== descriptor.md5;
+      const responseHeaders = {
+        'Cache-Control': 'no-store',
+        [AGENT_CONFIG_SCHEMA_HEADER]: String(AGENT_CONFIG_SCHEMA_VERSION),
+        [AGENT_CONFIG_MD5_HEADER]: descriptor.md5
+      };
+
+      if (!md5Changed && !hasCorrection) {
+        if (shouldUpdateAgent) {
+          return createAgentInstructionResponse('update=1');
+        }
+        return new Response(null, { status: 204, headers: responseHeaders });
+      }
+
+      let body = descriptor.serialized;
+      if (hasCorrection) {
+        body += serializeCorrection(descriptor.correction);
+      }
+      body = appendAgentUpdateParam(body, shouldUpdateAgent);
+
+      return new Response(body, {
+        status: 200,
+        headers: {
+          ...responseHeaders,
+          'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
+        }
+      });
+    } catch (configError) {
+      console.warn('[Update] Failed to build agent configuration:', configError?.message || configError);
+      if (shouldUpdateAgent) {
+        return createAgentInstructionResponse('update=1');
+      }
+      return new Response('OK', {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
+    }
   } catch (e) {
     return createErrorResponse(e);
   }
@@ -107,8 +326,15 @@ export async function handleWebSocketUpgrade(request, env) {
   try {
     const id = env.METRICS_BROADCASTER.idFromName('global');
     const stub = env.METRICS_BROADCASTER.get(id);
-    // 使用原始 request 构造新的内部请求，保留 WebSocket 升级语义
-    return await stub.fetch(new Request(`http://internal/ws${qs}`, request));
+    const realOrigin = new URL(request.url).origin;
+    const headers = new Headers(request.headers);
+    headers.set('X-Real-Origin', realOrigin);
+    return await stub.fetch(new Request(`http://internal/ws${qs}`, {
+      method: request.method,
+      headers,
+      body: request.body,
+      redirect: request.redirect
+    }));
   } catch (e) {
     console.error('[ws] DO upgrade failed:', e);
     return new Response(JSON.stringify({ error: 'WebSocket error', code: 500 }), {

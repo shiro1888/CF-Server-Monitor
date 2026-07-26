@@ -1,7 +1,6 @@
 let apiBases = []
 let wsBase = null
 let title = ''
-let backgroundImage = ''
 
 const stripTrailingSlash = (s) => String(s || '').replace(/\/+$/, '')
 
@@ -17,40 +16,34 @@ const computeWsBase = (origin) => {
 
 const setApiBases = (values) => {
   apiBases = values.map(v => stripTrailingSlash(v)).filter(v => v)
-  const first = apiBases.length > 0 ? apiBases[0] : stripTrailingSlash(window.location.origin)
-  wsBase = computeWsBase(first)
+  if (apiBases.length === 0) {
+    apiBases = [stripTrailingSlash(window.location.origin)]
+  }
+  wsBase = computeWsBase(apiBases[0])
   window.__APP_API_BASES__ = apiBases
   window.__APP_WS_BASE__ = wsBase
 }
 
 export const initConfig = async () => {
   setApiBases([window.location.origin])
-  try {
-    const res = await fetch(`/config.json?t=${Date.now()}`, {
-      cache: 'no-cache',
-      credentials: 'omit'
-    })
-    if (res && res.ok) {
-      const data = await res.json()
-      if (data && Array.isArray(data.apiBase)) {
-        setApiBases(data.apiBase.filter(u => typeof u === 'string' && u.trim()))
-      }
-      if (data && typeof data.title === 'string') {
-        title = data.title.trim()
-      }
-      if (data && typeof data.backgroundImage === 'string') {
-        backgroundImage = data.backgroundImage.trim()
-      }
+
+  // GitHub Pages/static builds inject runtime config through meta tags.
+  const metaApiBase = document.querySelector('meta[name="apiBase"]')?.content
+  if (metaApiBase) {
+    const bases = metaApiBase.split(',').map(s => s.trim()).filter(Boolean)
+    if (bases.length > 0) {
+      setApiBases(bases)
     }
-  } catch (e) {
-    // Network or parse failure -> keep the current-origin fallback
   }
+
+  title = document.title || ''
+
   return apiBases
 }
 
 export const getApiBases = () => {
   if (apiBases.length > 0) return apiBases
-  if (window.__APP_API_BASES__) return window.__APP_API_BASES__
+  if (window.__APP_API_BASES__?.length > 0) return window.__APP_API_BASES__
   return [stripTrailingSlash(window.location.origin)]
 }
 
@@ -64,12 +57,11 @@ export const hasMultipleApiBases = () => {
   return getApiBases().length > 1
 }
 
-export const getTitle = () => {
-  return title
+export const getTitle = () => title
+
+export const getPublicAssetUrl = (assetPath) => {
+  const cleanPath = String(assetPath || '').replace(/^\/+/, '')
+  return cleanPath ? `./${cleanPath}` : './'
 }
 
-export const getBackgroundImage = () => {
-  return backgroundImage
-}
-
-export default { initConfig, getApiBases, getWsBase, hasMultipleApiBases, getTitle, getBackgroundImage }
+export default { initConfig, getApiBases, getWsBase, hasMultipleApiBases, getTitle, getPublicAssetUrl }

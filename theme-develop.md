@@ -1,42 +1,22 @@
-# CF-Server-Monitor 前端主题开发文档
+# CF-Server-Monitor 第三方主题开发 API 文档
 
-> 面向 CF-Server-Monitor 前端主题开发的 API 参考。
+> 面向第三方主题开发作者的 API 参考。
 >
-> 本文档仅保留浏览器端调用的接口，去除后端内部实现细节。
+> 本文档只保留第三方主题可用的公开 API、WebSocket 和静态目录约定，不介绍后台管理接口。
 >
-> 如果仅需制作主题，无需关注管理端 API，直接跳转到/#/admin 即可。
-
-**配置文件**：`config.json`
-
-纯前端项目使用 `config.json` 作为配置文件，格式如下：
-
-```json
-{
-  "apiBase": [
-    "https://<your-worker-domain>",
-    "https://<your-worker-domain2>"
-  ],
-  "title": "CF-Server-Monitor",
-  "backgroundImage": "http://example.com/demo.jpg"
-}
-```
-
-| 字段                | 类型        | 说明                 |
-| ----------------- | --------- | ------------------ |
-| `apiBase`         | string\[] | API 后端地址列表，支持多后端轮询 |
-| `title`           | string    | 站点标题               |
-| `backgroundImage` | string    | 背景图片 URL           |
+> 管理后台固定由默认主题接管；主题中的管理入口只能跳转到 `/admin#admin`。
 
 **Base URL**：`https://<your-worker-domain>`
 
 **统一响应头**：
 
-- `Content-Type: application/json; charset=utf-8`（除特别说明外）
+- `Content-Type: application/json`（除特别说明外）
 
 ***
 
 ## 目录
 
+- [0. 运行时配置、构建产物与版本升级提示](#0-运行时配置构建产物与版本升级提示)
 - [1. 鉴权与 Turnstile 流程](#1-鉴权与-turnstile-流程)
 - **[2. 公开 API](#2-公开-api)**
   - **[2.1 获取站点配置](#21-获取站点配置)**
@@ -44,8 +24,97 @@
   - [2.3 获取服务器详情](#23-获取服务器详情)
   - [2.4 获取历史指标](#24-获取历史指标)
 - [3. WebSocket 实时推送](#3-websocket-实时推送)
-- [4. 错误处理](#5-错误处理)
-- [5. 类型定义](#6-类型定义)
+- [4. 错误处理](#4-错误处理)
+- [5. 类型定义](#5-类型定义)
+
+***
+
+## 0. 运行时配置、构建产物与版本升级提示
+
+### 0.1 API Base 配置
+
+`config.json` 已废弃，当前前端不会请求或读取 `config.json`。
+
+默认情况下，前端使用当前页面同源地址作为 API Base，即 `window.location.origin`。Worker/Pages 同域部署时无需额外配置。
+
+纯静态主题（例如 GitHub Pages）通过 HTML meta 标签配置后端地址：
+
+```html
+<meta name="apiBase" content="https://<your-worker-domain>,https://<your-worker-domain2>">
+```
+
+多个地址用英文逗号分隔。前端会按 `apiBase` 创建对应的 HTTP 请求和 WebSocket 连接，多站模式下每个后端只处理自己返回的服务器 ID。
+
+跨域部署主题时，还需要在每个源站 Cloudflare Workers 的环境变量中添加 `CORS_ALLOWED_ORIGINS`，位置和添加 `API_SECRET` 相同。把本地开发地址和最终上线域名加入白名单；如果 `API_BASE` 配置了多个 Workers，每个 Workers 都要添加这一项。
+
+```
+https://localhost:5173,https://[你的github用户名].github.io
+```
+
+该值只填写 origin，多个值用英文逗号分隔，不要包含路径、查询参数或结尾 `/`。如果线上主题域名不是 Worker 同源域名，也必须加入这里，否则浏览器会拦截 API 请求和 WebSocket 连接。
+
+使用项目内置静态主题构建脚本时，需要在主题项目 `.env` 中配置：
+
+| 环境变量 | 说明 | 默认值 |
+| --- | --- | --- |
+| `API_BASE` | 后端地址，多个地址用英文逗号分隔 | 必填 https://<your-worker-domain> |
+| `TITLE` | 静态页面标题 | 选填 |
+| `BACKGROUND_IMAGE` | 静态页面背景图 | 选填 |
+| `CSP_API` | 追加到 `connect-src` 的 API 白名单 | 选填 |
+| `CSP_STATIC` | 追加到静态资源相关 CSP 指令的白名单 | 选填 |
+
+运行：
+
+```bash
+npm run build:github-page
+```
+
+纯静态构建时，`API_BASE`、`TITLE`、`BACKGROUND_IMAGE`、`CSP_API`、`CSP_STATIC` 会写入 HTML 运行时配置。后台外观设置中的 `csp_api` 和 `csp_static` 也会影响页面允许加载的第三方 API 和静态资源域名。
+
+### 0.2 主题构建产物约定
+
+主题完成后提交到 [huilang-me/CFSM-Theme-Store](https://github.com/huilang-me/CFSM-Theme-Store) 项目。
+
+主题构建产物仅需要：
+
+- `index.html`
+- `assets/` 目录
+
+目录结构示例：
+
+```
+my-theme/
+├── index.html
+└── assets/
+    ├── app.css
+    ├── app.js
+    └── logo.webp
+```
+
+主题开发注意事项：
+
+- 主题提交目录只能生成 `index.html` 和 `assets/`；不要依赖其他主题目录或根目录文件
+- 静态资源应放在主题目录的 `assets/` 下，并在 HTML/JS/CSS 中使用 `/assets/...` 或相对 `assets/...`
+- 旗帜和 OS 图标走默认皮肤静态文件，不要打包进主题：旗帜使用 `/flags/<code>.svg`，OS 图标使用 `/os-icons/<filename>`
+- 站点标题、背景图、自定义 `<head>`、自定义脚本由用户后台外观设置控制，主题不要把这些配置写死
+- 主题不可用时应让页面暴露加载错误，不要在主题内静默跳转到其他页面
+
+路由约定：
+
+- 首页：`/#/` 或 `/#`
+- 详情页：`/#/server/:id`
+- 管理后台：链接到 `/admin#admin`，由内置默认主题接管，第三方主题不得实现管理页
+
+### 0.3 版本升级提示
+
+`GET /api/config` 会返回当前 Workers 版本 `version`。当请求带有有效 JWT 时，后端还会查询远程最新版并额外返回：
+
+- `last_workers_version`：最新 Workers 版本
+- `last_agent_version`：最新探针 Agent 版本
+
+第三方主题可以将 `version` 与 `last_workers_version` 做字符串比较，自行决定是否展示 Workers 升级提示。`last_agent_version` 仅在登录后返回，可用于可选的 Agent 版本提示。
+
+未登录访问 `/api/config` 时不会返回 `last_workers_version` / `last_agent_version`，自定义主题不要依赖匿名请求展示升级提示。
 
 ***
 
@@ -57,7 +126,7 @@
 
 | 机制         | 使用位置            | 方式                                           |
 | ---------- | --------------- | -------------------------------------------- |
-| JWT Bearer | 管理端 API、非公开站点访问 | `Authorization: Bearer <token>`              |
+| JWT Bearer | 非公开站点读取公开 API、查看 1 小时以上历史 | `Authorization: Bearer <token>`              |
 | Turnstile  | 公开 API（当启用时）    | `X-Turnstile-Token` 或 `X-Turnstile-Verified` |
 
 ### 1.2 Turnstile 人机验证流程
@@ -66,7 +135,7 @@
 1. 首次访问 → GET /api/config → 获取 turnstile_site_key
 2. 渲染 Turnstile 组件 → 获取一次性 token
 3. 后续请求 → 携带 X-Turnstile-Token 头
-4. 验证成功 → 响应头返回 X-Turnstile-Verified（加密凭证，有效期 1 小时）
+4. 验证成功 → /api/config 响应体返回 turnstile_verified（加密凭证，有效期 1 小时）
 5. 后续请求 → 可复用 X-Turnstile-Verified，省略 X-Turnstile-Token
 ```
 
@@ -75,12 +144,13 @@
 | Header                 | 方向              | 说明                        |
 | ---------------------- | --------------- | ------------------------- |
 | `X-Turnstile-Token`    | Client → Server | 当次 Turnstile token（明文）    |
-| `X-Turnstile-Verified` | 双向              | AES-GCM 加密的已验证凭证，客户端应缓存复用 |
+| `X-Turnstile-Verified` | Client → Server | AES-GCM 加密的已验证凭证，客户端应缓存复用 |
 
 **注意**：
 
 - `/api/ws`、`/api/config`（不带 Turnstile Header 时）无需验证
-- 登录接口 `action: login` 需要单独验证 Turnstile
+- `/api/config` 带 `X-Turnstile-Token` 或 `X-Turnstile-Verified` 时会进入验证流程，并通过 `verified` / `turnstile_verified` 返回验证结果
+- `turnstile_enabled` 是全局 API 验证开关，`turnstile_login_enabled` 是内置后台登录页验证开关；第三方主题不实现登录页，管理入口跳转 `/admin#admin`
 
 ***
 
@@ -95,17 +165,28 @@
 
 ```
 GET /api/config
-Headers: (可选) X-Turnstile-Token / X-Turnstile-Verified
+Headers: (可选) Authorization: Bearer <jwt>, X-Turnstile-Token / X-Turnstile-Verified
 ```
 
 **Response**
 
 ```json
 {
+  "version": "2.7.12 Beta",
+  "last_workers_version": "2.7.13",
+  "last_agent_version": "1.3.3",
+  "is_public": true,
+  "authorization": true,
   "turnstile_enabled": true,
+  "turnstile_login_enabled": true,
   "turnstile_site_key": "1x00000000000000000000AA",
+  "site_title": "My Server Monitor",
+  "theme_options": {
+    "a": 1,
+    "b": 2
+  },
   "verified": false,
-  "turnstile_verified": "BASE64_AES_GCM_ENCRYPTED_STRING_OR_NULL",
+  "turnstile_verified": null,
   "show_long_history": true
 }
 ```
@@ -114,11 +195,21 @@ Headers: (可选) X-Turnstile-Token / X-Turnstile-Verified
 
 | 字段                   | 类型           | 说明              |
 | -------------------- | ------------ | --------------- |
-| `turnstile_enabled`  | boolean      | 是否启用人机验证        |
+| `version`            | string       | 当前 Workers 版本号 |
+| `last_workers_version` | string\|null | 最新 Workers 版本，仅登录后返回 |
+| `last_agent_version` | string\|null | 最新 Agent 版本，仅登录后返回 |
+| `is_public`          | boolean      | 是否公开站点             |
+| `authorization`      | boolean      | 是否通过登录验证       |
+| `turnstile_enabled`  | boolean      | 是否启用全局 API 人机验证 |
+| `turnstile_login_enabled` | boolean | 是否启用登录页人机验证 |
 | `turnstile_site_key` | string       | Turnstile 前端公钥  |
+| `site_title`         | string       | 站点标题 |
+| `theme_options`      | object       | 第三方主题自定义配置；未配置时为空对象 |
 | `verified`           | boolean      | 当前请求是否已验证       |
 | `turnstile_verified` | string\|null | 已验证凭证，缓存复用 1 小时 |
 | `show_long_history`  | boolean      | 是否允许查看超过 1 小时历史 |
+
+`theme_options` 对第三方主题是只读运行时配置。需要修改主题配置时，跳转到内置后台 `/admin#admin`，不要在第三方主题内调用管理端接口。
 
 **示例**：
 
@@ -156,9 +247,8 @@ Headers: (按需) Authorization: Bearer <jwt>, X-Turnstile-Token/Verified
   "sysConfig": {
     "show_price": true,
     "show_expire": true,
-    "show_bw": true,
     "show_tf": true,
-    "site_title": "My Server Monitor"
+    "show_time": true
   }
 }
 ```
@@ -167,7 +257,7 @@ Headers: (按需) Authorization: Bearer <jwt>, X-Turnstile-Token/Verified
 
 | 字段            | 说明                          |
 | ------------- | --------------------------- |
-| `servers`     | 服务器列表（含最新指标），未登录用户自动过滤隐藏服务器 |
+| `servers`     | 服务器列表（含最新指标），未登录用户自动过滤隐藏服务器；`tags` 始终随服务器返回 |
 | `stats`       | 聚合统计（在线阈值 5 分钟）             |
 | `regionStats` | 按区域统计服务器数量                  |
 | `sysConfig`   | 站点开关配置，控制 UI 显示             |
@@ -199,14 +289,16 @@ Headers: (按需) Authorization, X-Turnstile-Token/Verified
   "id": "9b2c...",
   "name": "HK-01",
   "server_group": "HK",
-  "price": "￥30/月",
+  "tags": "prod,edge",
+  "price": "30.00",
+  "billing_cycle": "month",
+  "auto_renewal": "0",
+  "currency": "¥",
   "expire_date": "2026-12-31",
-  "bandwidth": "1Gbps",
   "traffic_limit": "1TB",
   "traffic_calc_type": "total",
   "reset_day": 1,
   "report_interval": 60,
-  "ping_mode": "http",
   "is_hidden": "0",
   "sort_order": 0,
   "cpu": 12.34,
@@ -237,6 +329,8 @@ Headers: (按需) Authorization, X-Turnstile-Token/Verified
 }
 ```
 
+`tags` 为英文逗号分隔字符串。`note` 属于管理端内部字段，不从 dashboard 公共接口返回。
+
 **失败返回**：
 
 - `400 { "error": "Missing ID" }`
@@ -263,27 +357,28 @@ Headers: (按需) Authorization, X-Turnstile-Token/Verified
 **参数**：
 
 - `id`（必填）：服务器 UUID
-- `hours`（可选，默认 24）：查询时长，最大 168（7 天）
+- `hours`（可选，默认 24）：查询时长，可选 `0.167`、`0.5`、`1`、`6`、`12`、`24`、`48`、`96`、`168`，最大 168（7 天）
 
 **Response**
 
 ```json
-{
-  "columns": ["timestamp", "cpu", "gpu", "..."],
-  "rows": [
-    { "timestamp": 1737600000000, "cpu": 12.3, ... },
-    { "timestamp": 1737600600000, "cpu": 13.1, ... },
-  ]
-}
+[
+  { "timestamp": 1737600000000, "cpu": 12.3, "gpu": null, "ram_used": 3700 },
+  { "timestamp": 1737600600000, "cpu": 13.1, "gpu": null, "ram_used": 3712 }
+]
 ```
 
-**注意**：未登录用户 `hours > 1` 时返回 `401`。
+**注意**：
+
+- 未登录用户 `hours > 1` 时返回 `401`
+- 服务端最多返回约 160 个采样点，会按查询时长自动降采样
+- 数据库字段缺失且需要升级时可能返回 `409 { "message": "databaseUpgradeRequired" }`
 
 **示例**：
 
 ```js
 const res = await fetch(`/api/history/all?id=${serverId}&hours=24`);
-const { columns, rows } = await res.json();
+const rows = await res.json();
 ```
 
 ***
@@ -299,35 +394,67 @@ Headers: Upgrade: websocket, Connection: Upgrade
 
 **参数**：
 
-- `subscribe`（可选，默认 `all`）：`all` 订阅所有服务器，`<serverId>` 只订阅指定服务器
+| 参数 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `subscribe` | 否 | `all` | `all` 订阅所有服务器，`<serverId>` 只订阅指定服务器 |
+
+**过滤机制**：
+
+- `subscribe=all` + 通道内发送 `subscribe` 消息：仅接收 `ids` 列表中的服务器更新
+- `subscribe=all` + 未发送 `subscribe` 消息：**不返回任何更新**
+- `subscribe=<serverId>`：始终只接收该服务器更新，不需要发送 `ids`
+- `ids` 最多 500 个，每个 ID 长度 1-64，仅允许字母、数字、`.`、`_`、`:`、`-`
+- `scope` 或 `ids` 格式非法时服务端会关闭 WebSocket 连接（close code `1008`）
+- `ids` 是客户端订阅过滤，不是服务端鉴权
+
+**多 apiBase 注意事项**：
+
+当配置了多个 `apiBase` 时，前端会为每个 apiBase 创建独立的 WebSocket 连接。每个连接发送的 `ids` 应只包含该 apiBase 返回的服务器 ID，而非全部服务器 ID。每个 Worker/DO 只知道自己的服务器，传入不属于它的 ID 不会产生任何效果。
+
+**推荐流程**：
+
+1. 调用 `GET /api/servers` 获取服务器列表（已按登录状态过滤隐藏服务器）
+2. 提取返回的 `servers[].id` 数组
+3. 连接 WebSocket：`?subscribe=all`
+4. 建连后通过 WebSocket 通道发送 `{ type: "subscribe", scope: "all", ids }`
 
 **推送策略**：
 
 | 订阅类型 | 推送方式 | 消息类型 | 说明 |
 | -------- | ----- | ----- | --- |
 | `subscribe=all` | 批量合并，每 5 秒一次 | `batchUpdate` | 减少消息数量，降低前端渲染压力 |
-| `subscribe=<serverId>` | 实时推送 | `update` | 单台服务器详情页，低延迟 |
+| `subscribe=<serverId>` | 实时推送 | `batchUpdate` | 单台服务器详情页，低延迟，统一消息格式 |
 
 **消息格式**：
 
-| 类型            | 方向    | 数据结构                                                                   |
-| ------------- | ----- | ---------------------------------------------------------------------- |
-| `hello`       | S → C | `{ type: "hello", ts: number, subscribed: string }`                    |
-| `ping`        | C → S | `{ type: "ping", ts: number }`                                         |
-| `pong`        | 双向    | `{ type: "pong", ts: number }`                                         |
-| `update`      | S → C | `{ type: "update", serverId: string, ts: number, data: Server }`       |
-| `batchUpdate` | S → C | `{ type: "batchUpdate", ts: number, updates: Array<{serverId, ts, data}> }` |
+| 类型 | 方向 | 数据结构 |
+| --- | --- | --- |
+| `hello` | S → C | `{ type: "hello", ts: number, subscribed: string }` |
+| `subscribe` | C → S | `{ type: "subscribe", scope: string, ids: string[] }` |
+| `subscribed` | S → C | `{ type: "subscribed", ts: number, subscribed: string, count: number }` |
+| `ping` | C → S | `{ type: "ping", ts: number }` |
+| `pong` | 双向 | `{ type: "pong", ts: number }` |
+| `batchUpdate` | S → C | `{ type: "batchUpdate", ts: number, updates: Array<{serverId, samples: Array<{ts, data}>}> }` |
 
-**示例（subscribe=all，批量推送）**：
+**示例（subscribe=all，带 ID 过滤）**：
 
 ```js
+// 1. 获取服务器列表
+const { servers } = await (await fetch('/api/servers')).json();
+const ids = servers.map(s => s.id);
+
+// 2. 连接 WebSocket，并通过通道消息提交订阅 ID 列表
 const ws = new WebSocket('wss://status.example.com/api/ws?subscribe=all');
+ws.onopen = () => {
+  ws.send(JSON.stringify({ type: 'subscribe', scope: 'all', ids }));
+};
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
   if (msg.type === 'batchUpdate') {
-    // 批量更新：遍历 updates 数组
     for (const u of msg.updates) {
-      updateServer(u.serverId, u.data);
+      for (const s of u.samples || []) {
+        updateServer(u.serverId, s.data);
+      }
     }
   }
 };
@@ -339,8 +466,12 @@ ws.onmessage = (ev) => {
 const ws = new WebSocket('wss://status.example.com/api/ws?subscribe=server-001');
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
-  if (msg.type === 'update') {
-    updateServer(msg.serverId, msg.data);
+  if (msg.type === 'batchUpdate') {
+    for (const u of msg.updates) {
+      for (const s of u.samples) {
+        updateServer(u.serverId, s.data);
+      }
+    }
   }
 };
 ```
@@ -353,9 +484,7 @@ ws.onmessage = (ev) => {
 
 **成功响应**：
 
-```json
-{ "success": true, ... }
-```
+成功响应直接返回业务对象或数组，具体结构见各接口；没有统一的 `success: true` 包装字段。
 
 **错误响应**：
 
@@ -371,6 +500,7 @@ ws.onmessage = (ev) => {
 | 401  | 未授权            | 重新登录或检查 JWT          |
 | 403  | Turnstile 验证失败 | 重新获取 Turnstile token |
 | 404  | 资源不存在          | 检查服务器 ID             |
+| 409  | 数据库需升级        | 提示管理员执行数据库升级      |
 | 500  | 服务器内部错误        | 联系管理员                |
 | 503  | WebSocket 不可用  | 降级为轮询                |
 
@@ -383,14 +513,16 @@ interface Server {
   id: string;
   name: string;
   server_group: string;
-  price: string;
+  tags: string;
+  price: string; // "0" 或 "-1" 表示免费，空白表示未设置
+  billing_cycle: string;
+  auto_renewal: string;
+  currency: string;
   expire_date: string;
-  bandwidth: string;
   traffic_limit: string;
   traffic_calc_type: string;
   reset_day: number;
   report_interval: number;
-  ping_mode: 'http' | 'tcp';
   is_hidden: '0' | '1';
   sort_order: number;
   cpu: number;
@@ -428,6 +560,7 @@ interface Server {
   ip_v4: '0' | '1';
   ip_v6: '0' | '1';
   boot_time: string;
+  agent_version?: string;
   last_updated: number;
   timestamp: number;
   is_online?: boolean;
@@ -435,50 +568,40 @@ interface Server {
 }
 
 interface SysConfig {
-  show_price: boolean;
-  show_expire: boolean;
-  show_bw: boolean;
-  show_tf: boolean;
-  site_title: string;
+  show_price?: boolean;
+  show_expire?: boolean;
+  show_tf?: boolean;
+  show_time?: boolean;
   show_long_history?: boolean;
 }
 
-interface Settings {
-  site_title: string;
-  custom_bg: string;
-  custom_head: string;
-  custom_script: string;
-  is_public: 'true' | 'false';
-  show_price: 'true' | 'false';
-  show_expire: 'true' | 'false';
-  show_bw: 'true' | 'false';
-  show_tf: 'true' | 'false';
-  show_long_history: 'true' | 'false';
-  tg_notify: 'true' | 'false';
-  tg_bot_token: string;
-  tg_chat_id: string;
-  turnstile_enabled: 'true' | 'false';
+interface SiteConfig {
+  version: string;
+  last_workers_version?: string | null;
+  last_agent_version?: string | null;
+  is_public: boolean;
+  authorization: boolean;
+  turnstile_enabled: boolean;
+  turnstile_login_enabled: boolean;
   turnstile_site_key: string;
-  turnstile_secret_key: string;
-  jwt_secret: string;
-  username: string;
-  password: string;
-  cloudflare_account_id: string;
-  cloudflare_token: string;
-  custom_ct: string;
-  custom_cu: string;
-  custom_cm: string;
-  custom_bd: string;
-  cleanup_skip_count: string;
-  expire_reminder: 'true' | 'false';
+  site_title: string;
+  theme_options: Record<string, unknown>;
+  verified: boolean;
+  turnstile_verified: string | null;
+  show_long_history: boolean;
 }
 
 interface WsMessage {
-  type: 'hello' | 'ping' | 'pong' | 'update';
+  type: 'hello' | 'subscribe' | 'subscribed' | 'ping' | 'pong' | 'batchUpdate';
   ts?: number;
   subscribed?: string;
+  scope?: string;
+  ids?: string[];
+  count?: number;
   serverId?: string;
-  data?: Server;
+  updates?: Array<{
+    serverId: string;
+    samples: Array<{ ts: number; data: Server }>;
+  }>;
 }
 ```
-
