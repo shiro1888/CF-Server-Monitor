@@ -6,11 +6,13 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 preview_urls = false
 
+# 保留 Cloudflare 面板上已有的环境变量，不被本文件覆盖。
+# 必须放在任何 [table] 之前，否则会被解析进 [[routes]] 里导致部署失败。
+keep_vars = true
+
 [[routes]]
 pattern = "probe.shiro1888.com"
 custom_domain = true
-
-keep_vars = true
 
 # 定时任务配置（UTC）
 # - 每2分钟：执行离线节点检测
