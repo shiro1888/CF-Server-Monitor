@@ -18,7 +18,33 @@ jobs:
     steps:
       # Step 1: run a standard checkout action
       - name: Checkout target repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # This fork owns its live Worker configuration and deployment workflow.
+      # Do not let an automatic upstream sync overwrite those production files.
+      - name: Protect fork-owned production files
+        env:
+          UPSTREAM_REPOSITORY: huilang-me/CF-Server-Monitor
+          UPSTREAM_BRANCH: main
+        run: |
+          if git remote get-url upstream >/dev/null 2>&1; then
+            git remote set-url upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          else
+            git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          fi
+          git fetch --no-tags upstream "+refs/heads/${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"
+          protected_files="$(
+            git log --format= --name-only "HEAD..upstream/${UPSTREAM_BRANCH}" -- \
+              wrangler.toml .github/workflows/deploy.yml .github/workflows/sync.yml |
+              sed '/^$/d' | sort -u
+          )"
+          if [ -n "$protected_files" ]; then
+            echo "::error::Upstream changed fork-owned production files. Manual merge is required before deployment."
+            printf '%s\n' "$protected_files"
+            exit 1
+          fi
 
       # Step 2: run the sync action
       - name: Sync upstream changes
@@ -36,8 +62,8 @@ jobs:
       - name: Sync check
         if: failure()
         run: |
-          echo "[Error] 由于上游仓库的 workflow 文件变更，导致 GitHub 自动暂停了本次自动更新，请前往仓库页面手动执行 Sync Fork 操作。"
-          echo "[Error] Due to a change in the workflow file of the upstream repository, GitHub has automatically suspended the scheduled automatic update. You need to manually sync your fork."
+          echo "[Error] 上游改动了本项目的生产配置，或更新无法自动合并；未推送任何变更，请人工审核后再同步。"
+          echo "[Error] Upstream changed fork-owned production files, or the update could not be merged automatically. No changes were pushed; manual review is required."
           exit 1
 
       # Commits made with GITHUB_TOKEN do not trigger push-based workflows.

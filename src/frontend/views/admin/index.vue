@@ -145,6 +145,7 @@
           @toggle-admin-password-change="toggleAdminPasswordChange"
           @save-settings="saveSettings"
           @upload-bg="uploadBg"
+          @upload-bg-mobile="uploadBgMobile"
           @upload-favicon="uploadFavicon"
           @send-test-notification="sendTestNotification"
           @query-d1-usage="queryD1Usage"
@@ -650,6 +651,30 @@ const normalizeExpireReminderSetting = (value) => {
 
 const isExpireReminderEnabled = (value) => normalizeExpireReminderSetting(value) !== '0'
 
+const isValidNotificationTimezone = (value) => {
+  const timezone = String(value || '').trim()
+  if (!timezone || timezone.length > 64) return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date(0))
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
+const normalizeNotificationTimezoneSetting = (value) => {
+  const timezone = String(value || '').trim()
+  return isValidNotificationTimezone(timezone) ? timezone : 'UTC'
+}
+
+const normalizeExpireNotificationTimeSetting = (value) => {
+  const raw = String(value ?? '').trim()
+  if (!raw) return '12'
+  const legacyTimeMatch = raw.match(/^([01]?\d|2[0-3]):[0-5]\d$/)
+  const hour = Number(legacyTimeMatch ? legacyTimeMatch[1] : raw)
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? String(hour) : '12'
+}
+
 const normalizeLongHistoryPointsSetting = (value) => {
   const points = Number(value)
   return String(
@@ -664,6 +689,31 @@ const normalizeFrontendWsTimeoutMinutesSetting = (value) => {
   return Number.isInteger(minutes) && minutes >= 0 && minutes <= FRONTEND_WS_TIMEOUT_MINUTES_MAX
     ? minutes
     : 0
+}
+
+const normalizeWssReportHoursSetting = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return Array.from({ length: 24 }, (_, hour) => hour)
+  }
+
+  let source = value
+  if (typeof source === 'string') {
+    try {
+      source = JSON.parse(source)
+    } catch (_) {
+      source = source.split(',').map(item => item.trim()).filter(Boolean)
+    }
+  }
+  if (!Array.isArray(source)) return Array.from({ length: 24 }, (_, hour) => hour)
+
+  return Array.from(new Set(source
+    .map(hour => {
+      if (typeof hour === 'number') return hour
+      if (typeof hour === 'string' && /^\d{1,2}$/.test(hour.trim())) return Number(hour)
+      return NaN
+    })
+    .filter(hour => Number.isInteger(hour) && hour >= 0 && hour <= 23)))
+    .sort((a, b) => a - b)
 }
 
 const normalizeResourceAlertModeSetting = (value) => {
@@ -834,6 +884,7 @@ const newServerGroup = ref('')
 const settings = ref({
   site_title: '',
   custom_bg: '',
+  custom_bg_mobile: '',
   favicon: '',
   custom_head: '',
   custom_script: '',
@@ -845,6 +896,7 @@ const settings = ref({
   show_tf: true,
   show_three_net_details: false,
   wss_report_enabled: false,
+  wss_report_hours: Array.from({ length: 24 }, (_, hour) => hour),
   frontend_ws_timeout_minutes: 0,
   long_history_points: String(HISTORY.DEFAULT_LONG_RANGE_POINTS),
   tg_notify: '0',
@@ -852,6 +904,8 @@ const settings = ref({
   resource_alert_rules: [],
   tg_bot_token: '',
   tg_chat_id: '',
+  notification_timezone: 'UTC',
+  expire_notification_time: '12',
   notification_webhook_enabled: false,
   notification_webhook_url: '',
   notification_webhook_method: 'POST',
@@ -1248,6 +1302,7 @@ const loadSettings = async () => {
       settings.value = {
         site_title: settingsData.site_title || '',
         custom_bg: settingsData.custom_bg || '',
+        custom_bg_mobile: settingsData.custom_bg_mobile || '',
         favicon: settingsData.favicon || '',
         custom_head: settingsData.custom_head || '',
         custom_script: settingsData.custom_script || '',
@@ -1259,6 +1314,7 @@ const loadSettings = async () => {
         show_tf: settingsData.show_tf === 'true',
         show_three_net_details: settingsData.show_three_net_details === 'true' || settingsData.show_three_net_details === true,
         wss_report_enabled: settingsData.wss_report_enabled === 'true' || settingsData.wss_report_enabled === true,
+        wss_report_hours: normalizeWssReportHoursSetting(settingsData.wss_report_hours),
         frontend_ws_timeout_minutes: normalizeFrontendWsTimeoutMinutesSetting(settingsData.frontend_ws_timeout_minutes),
         long_history_points: normalizeLongHistoryPointsSetting(settingsData.long_history_points),
         tg_notify: normalizeTgNotifySetting(settingsData.tg_notify),
@@ -1266,6 +1322,8 @@ const loadSettings = async () => {
         resource_alert_rules: normalizeResourceAlertRulesSetting(settingsData.resource_alert_rules),
         tg_bot_token: settingsData.tg_bot_token || '',
         tg_chat_id: settingsData.tg_chat_id || '',
+        notification_timezone: normalizeNotificationTimezoneSetting(settingsData.notification_timezone),
+        expire_notification_time: normalizeExpireNotificationTimeSetting(settingsData.expire_notification_time),
         notification_webhook_enabled: settingsData.notification_webhook_enabled === 'true' || settingsData.notification_webhook_enabled === true,
         notification_webhook_url: settingsData.notification_webhook_url || '',
         notification_webhook_method: String(settingsData.notification_webhook_method || 'POST').toUpperCase() === 'GET' ? 'GET' : 'POST',
@@ -1341,6 +1399,16 @@ const saveSettings = async () => {
     return
   }
 
+  if (!isValidNotificationTimezone(settings.value.notification_timezone)) {
+    validationError.value = trans.value.invalidNotificationTimezone || 'Notification timezone must be a valid IANA timezone, for example Asia/Shanghai'
+    return
+  }
+
+  if (normalizeExpireNotificationTimeSetting(settings.value.expire_notification_time) !== String(settings.value.expire_notification_time)) {
+    validationError.value = trans.value.invalidExpireNotificationTime || 'Expiration notification time must be an integer from 0 to 23'
+    return
+  }
+
   const shouldChangePassword = changeAdminPassword.value && (
     settings.value.password.length > 0 ||
     settings.value.confirm_password.length > 0
@@ -1404,6 +1472,7 @@ const saveSettings = async () => {
     settings: {
       site_title: settings.value.site_title,
       custom_bg: settings.value.custom_bg,
+      custom_bg_mobile: settings.value.custom_bg_mobile,
       favicon: settings.value.favicon,
       custom_head: settings.value.custom_head,
       custom_script: settings.value.custom_script,
@@ -1417,6 +1486,7 @@ const saveSettings = async () => {
       show_tf: settings.value.show_tf ? 'true' : 'false',
       show_three_net_details: settings.value.show_three_net_details ? 'true' : 'false',
       wss_report_enabled: settings.value.wss_report_enabled ? 'true' : 'false',
+      wss_report_hours: normalizeWssReportHoursSetting(settings.value.wss_report_hours),
       frontend_ws_timeout_minutes: String(frontendWsTimeoutMinutes),
       long_history_points: normalizeLongHistoryPointsSetting(settings.value.long_history_points),
       tg_notify: normalizeTgNotifySetting(settings.value.tg_notify),
@@ -1424,6 +1494,8 @@ const saveSettings = async () => {
       resource_alert_rules: normalizeResourceAlertRulesSetting(settings.value.resource_alert_rules),
       tg_bot_token: settings.value.tg_bot_token,
       tg_chat_id: settings.value.tg_chat_id,
+      notification_timezone: normalizeNotificationTimezoneSetting(settings.value.notification_timezone),
+      expire_notification_time: normalizeExpireNotificationTimeSetting(settings.value.expire_notification_time),
       notification_webhook_enabled: settings.value.notification_webhook_enabled ? 'true' : 'false',
       notification_webhook_url: settings.value.notification_webhook_url,
       notification_webhook_method: settings.value.notification_webhook_method === 'GET' ? 'GET' : 'POST',
@@ -2089,6 +2161,8 @@ const uploadImageSetting = (e, field) => {
 
 const uploadBg = (e) => uploadImageSetting(e, 'custom_bg')
 
+const uploadBgMobile = (e) => uploadImageSetting(e, 'custom_bg_mobile')
+
 const uploadFavicon = (e) => uploadImageSetting(e, 'favicon')
 
 const handleUpgradeDatabase = async () => {
@@ -2171,7 +2245,9 @@ const sendTestNotification = async () => {
       notification_webhook_format: settings.value.notification_webhook_format,
       notification_webhook_headers: settings.value.notification_webhook_headers,
       notification_webhook_body: settings.value.notification_webhook_body,
-      notification_template: settings.value.notification_template
+      notification_template: settings.value.notification_template,
+      notification_timezone: normalizeNotificationTimezoneSetting(settings.value.notification_timezone),
+      expire_notification_time: normalizeExpireNotificationTimeSetting(settings.value.expire_notification_time)
     })
     if (!result.error) {
       alertMessage.value = getMessage(result.data.message) || trans.value.testNotificationSent

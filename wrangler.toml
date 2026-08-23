@@ -15,7 +15,7 @@ pattern = "probe.shiro1888.com"
 custom_domain = true
 
 # 定时任务配置（UTC）
-# - 每2分钟：执行离线节点检测
+# - 每2分钟：执行离线节点、资源告警
 #   （2026-07-27 由 */1 改为 */2 以降低请求量：1440/天 -> 720/天。
 #    离线判定阈值是硬编码的 300000ms/5分钟，与本 cron 间隔无关，
 #    所以最坏告警延迟只从 ~6 分钟变为 ~7 分钟。
@@ -24,7 +24,7 @@ custom_domain = true
 #      src/handlers/dashboard.js:134
 #      src/handlers/admin.js:411
 #    原注释引用的 src/services/notification.js 在上游重构后已不含该阈值。）
-# - 每小时：合并执行其他定时任务（每月1号数据清理、每月8号清理旧表、每天12点服务器到期检测）
+# - 每小时：合并执行其他定时任务（表轮换、旧表清理、按配置时区/小时触发服务器到期检测）
 # - 注意同步修改deploy和index.js scheduled函数里面的值
 [triggers]
 crons = ["*/2 * * * *", "0 * * * *"]
