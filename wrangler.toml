@@ -1,5 +1,5 @@
 # prod-watch-core production config
-# acceptance test 2026-11-15T04:36 for Workers Builds / manual deploy (2026-11-15)
+# acceptance test 2026-11-15T05:03
 # keep_vars = true preserves existing secrets (API_SECRET) and plain vars (CORS_ALLOWED_ORIGINS)
 name = "prod-watch-core"
 main = "src/index.js"
