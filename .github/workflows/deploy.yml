@@ -1,14 +1,19 @@
-name: Manual deploy prod-watch-core (fallback)
-
-# push 自动部署已由 Cloudflare Workers Builds 接管(Git 集成,卡片显示 GitHub 徽标)。
-# 本 workflow 仅作为手动补部署通道。上游同步由 sync-upstream.yml 完成。
+name: Deploy prod-watch-core to Cloudflare Workers
 
 on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    name: Build and deploy prod-watch-core
     steps:
       - name: Checkout
         uses: actions/checkout@v4
