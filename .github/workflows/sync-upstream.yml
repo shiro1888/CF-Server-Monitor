@@ -26,7 +26,8 @@ jobs:
           git remote add upstream https://github.com/huilang-me/CF-Server-Monitor.git
           git fetch upstream main
           git checkout upstream/main -- .
-          git checkout HEAD -- .github/workflows/deploy.yml .github/workflows/sync-upstream.yml
+          git checkout HEAD -- .github/workflows/deploy.yml
+          git checkout HEAD -- wrangler.toml .github/workflows/sync-upstream.yml
           rm -f .github/workflows/sync.yml .github/workflows/deploy-github-page.yml
           git add -A
           if git diff --cached --quiet; then
