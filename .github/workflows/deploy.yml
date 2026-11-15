@@ -1,68 +1,27 @@
-name: Deploy prod-watch-core to Cloudflare Workers
+name: Manual deploy prod-watch-core (fallback)
+
+# push 自动部署已由 Cloudflare Workers Builds 接管(Git 集成,卡片显示 GitHub 徽标)。
+# 本 workflow 仅作为手动补部署通道。上游同步由 sync-upstream.yml 完成。
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'LICENSE'
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Build and deploy prod-watch-core
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
       - name: Install dependencies
         run: npm ci
-
       - name: Build frontend assets
         run: npm run build:frontend
-
-      - name: Write wrangler.toml (production bindings for prod-watch-core)
-        run: |
-          cat > wrangler.toml << 'WEOF'
-          # prod-watch-core production bindings (audit 2026-11-15)
-          # keep_vars = true preserves existing secrets (API_SECRET) and plain vars (CORS_ALLOWED_ORIGINS)
-          name = "prod-watch-core"
-          main = "src/index.js"
-          compatibility_date = "2026-06-26"
-          compatibility_flags = ["nodejs_compat"]
-          keep_vars = true
-          workers_dev = false
-
-          [triggers]
-          crons = ["*/1 * * * *", "0 * * * *"]
-
-          [assets]
-          directory = "./dist"
-          binding = "ASSETS"
-
-          [[d1_databases]]
-          binding = "DB"
-          database_name = "prod-watch-db"
-          database_id = "71afa248-e906-486e-afff-3ae3b88c070a"
-
-          [[durable_objects.bindings]]
-          name = "METRICS_BROADCASTER"
-          class_name = "MetricsBroadcaster"
-
-          [[migrations]]
-          tag = "v1"
-          new_sqlite_classes = ["MetricsBroadcaster"]
-          WEOF
-
       - name: Deploy Worker
-        run: npx wrangler@4 deploy
+        run: npx wrangler@4 deploy -c wrangler-build.toml
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
