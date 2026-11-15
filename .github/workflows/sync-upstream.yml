@@ -2,6 +2,7 @@ name: Sync upstream CF-Server-Monitor
 
 permissions:
   contents: write
+  actions: write
 
 on:
   schedule:
@@ -20,7 +21,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Take upstream tree, keep fork-only workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          BEFORE=$(git rev-parse HEAD)
           git config user.name "cfsm-sync-bot"
           git config user.email "4444023+cfsm-sync-bot@users.noreply.github.com"
           git remote add upstream https://github.com/huilang-me/CF-Server-Monitor.git
@@ -34,5 +38,8 @@ jobs:
             echo "No upstream changes to sync"
           else
             git commit -m "sync: upstream CF-Server-Monitor $(date -u +%Y-%m-%d)"
+            git push origin main
+            if ! git diff --quiet "$BEFORE" HEAD -- ':!*.md' ':!.gitignore' ':!LICENSE'; then
+              gh workflow run deploy.yml --repo "${{ github.repository }}" --ref main
+            fi
           fi
-          git push origin main
